@@ -1,0 +1,138 @@
+"use client";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mail, Lock, User, ArrowRight, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+export default function Login() {
+  const [isRegister, setIsRegister] = useState(false);
+  const [role, setRole] = useState<"buyer" | "seller">("buyer");
+
+  return (
+    <div className="min-h-screen pt-24 pb-16 bg-[#0A192F] flex items-center justify-center relative overflow-hidden selection:bg-amber-500/30">
+      {/* Background Ambience */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.08)_0%,transparent_70%)] pointer-events-none" />
+      <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-md relative z-10 px-4"
+      >
+        <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[40px] p-8 md:p-12 border border-white/10 shadow-2xl relative overflow-hidden">
+          {/* Subtle Inner Rim */}
+          <div className="absolute inset-0 border border-amber-500/5 rounded-[40px] pointer-events-none" />
+
+          <div className="text-center mb-10 space-y-3">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+              <span className="text-amber-500 text-[9px] font-bold tracking-[0.4em] uppercase">
+                Members Portal
+              </span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold text-white tracking-tight">
+              {isRegister ? "Create " : "Welcome "} 
+              <span className="text-white/40 italic font-light">{isRegister ? "Legacy" : "Back"}</span>
+            </h1>
+            <p className="text-white/30 text-sm font-light leading-relaxed">
+              {isRegister ? "Join our exclusive network of estates" : "Access your private portfolio and insights"}
+            </p>
+          </div>
+
+          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+            <AnimatePresence mode="wait">
+              {isRegister && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="relative"
+                >
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <Input 
+                    type="text" 
+                    placeholder="Full Name" 
+                    className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <Input 
+                type="email" 
+                placeholder="Email Address" 
+                className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
+              />
+            </div>
+
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <Input 
+                type="password" 
+                placeholder="Password" 
+                className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
+              />
+            </div>
+
+            {isRegister && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }}
+                className="space-y-3 pt-2"
+              >
+                <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 ml-1">Account Role</label>
+                <div className="flex gap-3">
+                  {(["buyer", "seller"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRole(r)}
+                      className={`flex-1 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border ${
+                        role === r 
+                        ? "bg-amber-500 border-amber-500 text-[#0A192F] shadow-[0_0_20px_rgba(245,158,11,0.2)]" 
+                        : "bg-white/5 border-white/5 text-white/40 hover:border-white/20"
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            <Button className="w-full h-14 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-amber-500/10 mt-4 transition-all active:scale-[0.98]">
+              {isRegister ? "Establish Account" : "Enter Portal"} <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </form>
+
+          {/* Social Access */}
+          <div className="mt-10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex-1 h-px bg-white/5" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Access</span>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button className="h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all">Google</button>
+              <button className="h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all">Apple</button>
+            </div>
+          </div>
+
+          <p className="text-center text-[10px] font-bold uppercase tracking-widest text-white/20 mt-10">
+            {isRegister ? "Registered member?" : "Seeking access?"}{" "}
+            <button 
+              onClick={() => setIsRegister(!isRegister)} 
+              className="text-amber-500 hover:text-amber-400 transition-colors ml-1"
+            >
+              {isRegister ? "Enter Portal" : "Establish Account"}
+            </button>
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
