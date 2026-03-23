@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
+import { QueryProvider } from "@/components/QueryProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,10 +32,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Navbar />
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
-        <Footer />
+        <QueryProvider>
+          <Navbar />
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
+          <Footer />
+        </QueryProvider>
       </body>
     </html>
   );

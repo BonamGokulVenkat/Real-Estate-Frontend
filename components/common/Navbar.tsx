@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, User, Heart, Search, BadgeDollarSign, LayoutGrid, X } from "lucide-react";
+import { Menu, User, Heart, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown } from "lucide-react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/useCurrency";
+import { CurrencyCode } from "@/store/useCurrencyStore";
 
 import { Button } from "@/components/ui/button";
 import { 
@@ -28,6 +30,8 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false); // Track if sidebar is open
   const pathname = usePathname();
+  const { currency, setCurrency } = useCurrency();
+  const CURRENCIES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -108,7 +112,21 @@ export default function Navbar() {
                     </Link>
                   </Button>
                 </SheetClose>
-                <div className="flex justify-center mt-6">
+                <div className="flex items-center justify-between mt-6 px-2">
+                   <div className="flex items-center gap-2">
+                     <span className="text-white/40 text-xs uppercase font-bold tracking-widest">Currency</span>
+                     <select 
+                       value={currency} 
+                       onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
+                       className="bg-transparent text-amber-500 font-bold text-sm outline-none cursor-pointer appearance-none ml-2"
+                     >
+                       {CURRENCIES.map(code => (
+                         <option key={code} value={code} className="bg-[#0A192F] text-white">
+                           {code}
+                         </option>
+                       ))}
+                     </select>
+                   </div>
                    <Link href="/favorites" className="text-white/30 hover:text-amber-500 transition-colors">
                       <Heart className="w-6 h-6" />
                    </Link>
@@ -161,8 +179,30 @@ export default function Navbar() {
         </div>
 
         {/* ── Right Actions (Desktop) ── */}
-        <div className="hidden lg:flex items-center gap-6">
-          <Link href="/profile" className="text-white/60 hover:text-white">
+        <div className="hidden lg:flex items-center gap-6 relative">
+          
+          {/* Currency Dropdown */}
+          <div className="relative group cursor-pointer flex items-center gap-1.5 text-white/60 hover:text-amber-500 font-medium text-sm transition-colors">
+            <span>{currency}</span>
+            <ChevronDown className="w-4 h-4" />
+            
+            <div className="absolute top-full right-0 mt-2 w-24 bg-[#0A192F]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
+              {CURRENCIES.map(code => (
+                <button
+                  key={code}
+                  onClick={() => setCurrency(code)}
+                  className={cn(
+                    "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-white/10",
+                    currency === code ? "text-amber-500 font-bold" : "text-white/80"
+                  )}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Link href="/profile" className="text-white/60 hover:text-amber-500 transition-colors">
             <Heart className="w-5 h-5" />
           </Link>
           <Button asChild className="rounded-xl px-6 h-11 bg-white/10 hover:bg-white/20 text-white border border-white/10 font-semibold">

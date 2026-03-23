@@ -2,7 +2,9 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Building2, Users2 } from "lucide-react";
+import { ArrowRight, Sparkles, Building2, Users2, Loader2, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "@/hooks/useLocation";
 
 // Components
 import HeroSection from "@/components/common/HeroSection";
@@ -16,7 +18,8 @@ import NewsletterSection from "@/components/common/NewsletterSection";
 import { Button } from "@/components/ui/button";
 
 // Dummy Data
-import { properties, agencies } from "@/data/dummyData";
+import { agencies } from "@/data/dummyData";
+import { propertyService, Property } from "@/services/propertyService";
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
@@ -26,7 +29,22 @@ const fadeInUp = {
 } as const;
 
 export default function Index() {
-  const featured = properties.filter((p) => p.featured);
+  const { city } = useLocation();
+
+  const { data: properties, isLoading, error } = useQuery<Property[]>({
+    queryKey: ['properties', 'featured', city],
+    queryFn: async () => {
+      if (city) {
+        const localProps = await propertyService.search({ location: city, limit: 4 });
+        if (localProps && localProps.length > 0) {
+          return localProps;
+        }
+      }
+      return propertyService.search({ limit: 4 });
+    },
+  });
+
+  const featured = properties || [];
 
   return (
     <div className="bg-[#0A192F] min-h-screen text-white selection:bg-amber-500/30 overflow-x-hidden">
@@ -45,8 +63,9 @@ export default function Index() {
           >
             <div className="flex items-center gap-3">
               <span className="h-[1px] w-8 bg-amber-500/50" />
-              <span className="text-amber-500 text-[10px] font-bold tracking-[0.4em] uppercase">
-                Curated Collection
+              <span className="text-amber-500 text-[10px] font-bold tracking-[0.4em] uppercase flex items-center gap-2">
+                {city && <MapPin className="w-3 h-3" />}
+                {city ? `Curated for you in ${city}` : "Curated Collection"}
               </span>
               <span className="h-[1px] w-8 bg-amber-500/50" />
             </div>
@@ -68,11 +87,19 @@ export default function Index() {
           </motion.div>
 
           {/* Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
-            {featured.map((p, i) => (
-              <PropertyCard key={p.id} property={p} index={i} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center py-20">
+              <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+            </div>
+          ) : error ? (
+            <div className="text-center text-red-500 py-10">Failed to load properties. Please try again later.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8">
+              {featured.map((p, i) => (
+                <PropertyCard key={p.property_id} property={p} index={i} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

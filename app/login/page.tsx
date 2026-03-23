@@ -1,13 +1,75 @@
 "use client";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, User, ArrowRight, Sparkles } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { authService } from "@/services/authService";
+import { useAuthStore, UserProfile } from "@/store/useAuthStore";
+import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
-  const [role, setRole] = useState<"buyer" | "seller">("buyer");
+  const [role, setRole] = useState<"individual" | "builder">("individual");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const setUser = useAuthStore((state) => state.setUser);
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      let data;
+      if (isRegister) {
+        data = await authService.register({
+          email,
+          password,
+          name,
+          role,
+        });
+        toast.success("Account created successfully!");
+      } else {
+        data = await authService.login({
+          email,
+          password,
+        });
+        toast.success("Logged in successfully!");
+      }
+
+      // Store tokens
+      Cookies.set("access_token", data.access_token);
+      if (data.refresh_token) {
+        Cookies.set("refresh_token", data.refresh_token);
+      }
+
+      // We might need to map the backend user to UserProfile
+      const profile = data.user as unknown as UserProfile;
+      setUser(profile);
+
+      // Redirect
+      if (profile.role === "admin") {
+        router.push("/admin");
+      } else if (profile.role === "builder") {
+        router.push("/sell");
+      } else {
+        router.push("/");
+      }
+
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-[#0A192F] flex items-center justify-center relative overflow-hidden selection:bg-amber-500/30">
@@ -41,7 +103,7 @@ export default function Login() {
             </p>
           </div>
 
-          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <AnimatePresence mode="wait">
               {isRegister && (
                 <motion.div
@@ -54,6 +116,9 @@ export default function Login() {
                   <Input 
                     type="text" 
                     placeholder="Full Name" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required={isRegister}
                     className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
                   />
                 </motion.div>
@@ -65,6 +130,9 @@ export default function Login() {
               <Input 
                 type="email" 
                 placeholder="Email Address" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                 className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
               />
             </div>
@@ -74,6 +142,9 @@ export default function Login() {
               <Input 
                 type="password" 
                 placeholder="Password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
                 className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
               />
             </div>
@@ -86,7 +157,7 @@ export default function Login() {
               >
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 ml-1">Account Role</label>
                 <div className="flex gap-3">
-                  {(["buyer", "seller"] as const).map((r) => (
+                  {(["individual", "builder"] as const).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -97,15 +168,25 @@ export default function Login() {
                         : "bg-white/5 border-white/5 text-white/40 hover:border-white/20"
                       }`}
                     >
-                      {r}
+                      {r === "individual" ? "buyer" : "seller"}
                     </button>
                   ))}
                 </div>
               </motion.div>
             )}
 
-            <Button className="w-full h-14 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-amber-500/10 mt-4 transition-all active:scale-[0.98]">
-              {isRegister ? "Establish Account" : "Enter Portal"} <ArrowRight className="w-4 h-4 ml-2" />
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full h-14 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-amber-500/10 mt-4 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+              ) : (
+                <>
+                  {isRegister ? "Establish Account" : "Enter Portal"} <ArrowRight className="w-4 h-4 ml-2 inline" />
+                </>
+              )}
             </Button>
           </form>
 
@@ -117,15 +198,30 @@ export default function Login() {
               <div className="flex-1 h-px bg-white/5" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <button className="h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all">Google</button>
-              <button className="h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all">Apple</button>
+              <a 
+                href={`${API_URL}/auth/google`}
+                className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
+              >
+                Google
+              </a>
+              <a 
+                href={`${API_URL}/auth/linkedin`}
+                className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
+              >
+                LinkedIn
+              </a>
             </div>
           </div>
 
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-white/20 mt-10">
             {isRegister ? "Registered member?" : "Seeking access?"}{" "}
             <button 
-              onClick={() => setIsRegister(!isRegister)} 
+              onClick={() => {
+                setIsRegister(!isRegister);
+                setEmail("");
+                setPassword("");
+                setName("");
+              }} 
               className="text-amber-500 hover:text-amber-400 transition-colors ml-1"
             >
               {isRegister ? "Enter Portal" : "Establish Account"}
