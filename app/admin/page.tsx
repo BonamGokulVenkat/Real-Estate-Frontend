@@ -94,7 +94,7 @@ export default function AdminOverview() {
             </thead>
             <tbody className="text-sm border-b border-white/5">
               {allUsers.slice(0, 5).map((u: any) => (
-                <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
+                <tr key={u.id ?? u.email} className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
                   <td className="py-4">
                     <div className="font-medium text-white">{u.name || "Unknown"}</div>
                     <div className="text-white/40 text-xs">{u.email}</div>

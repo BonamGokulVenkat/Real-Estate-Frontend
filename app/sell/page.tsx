@@ -6,7 +6,7 @@ import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { propertyService, PropertyStatus, PropertyType } from "@/services/propertyService";
 import { supabase } from "@/lib/supabase";
@@ -29,10 +29,22 @@ interface SellForm {
 
 export default function Sell() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Role guard: only builders may access this page ───────────────────────
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== "builder") {
+      toast.error("Only registered builders can list properties.");
+      router.replace("/");
+    }
+  }, [isAuthenticated, user, router]);
+
+  // Render nothing while redirecting
+  if (!isAuthenticated || user?.role !== "builder") return null;
+
 
   const {
     register,
@@ -101,6 +113,31 @@ export default function Sell() {
         });
       }
 
+      toast.loading("Locating property on map...", { id: toastId });
+
+      // ── Geocode the address via Nominatim (OpenStreetMap, no API key needed) ──
+      let lat = 0;
+      let lng = 0;
+      try {
+        const addressQuery = encodeURIComponent(
+          [data.address, data.city, data.state].filter(Boolean).join(", ")
+        );
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${addressQuery}&limit=1`,
+          { headers: { "Accept-Language": "en-US,en;q=0.9" } }
+        );
+        const geoData = await geoRes.json();
+        if (!geoData || geoData.length === 0) {
+          throw new Error("Could not find the location. Please check the address, city, and state.");
+        }
+        lat = parseFloat(geoData[0].lat);
+        lng = parseFloat(geoData[0].lon);
+      } catch (geoErr: any) {
+        toast.error(geoErr.message || "Geocoding failed. Please enter a valid address.", { id: toastId });
+        setIsSubmitting(false);
+        return;
+      }
+
       toast.loading("Publishing property details...", { id: toastId });
 
       const payload = {
@@ -112,16 +149,16 @@ export default function Sell() {
         size_sqft: Number(data.size),
         price: Number(data.price),
         location: {
-          address: data.address || "TBA",
-          city: data.city || "Mumbai",
-          state: data.state || "MH",
-          lat: 19.0760, // Dummy coords
-          lng: 72.8777,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          lat,
+          lng,
         },
         features: ["Premium Finish", "High Ceilings"],
         status: "available" as PropertyStatus,
         media: uploadedMedia,
-        builder: { user_id: user.id }
+        builder: { user_id: user.user_id }
       };
 
       const property = await propertyService.create(payload as any);
@@ -238,15 +275,33 @@ export default function Sell() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>City</label>
-                  <Input {...register("city", { required: "City is required" })} className={inputStyle} placeholder="Mumbai" />
+                  <label className={labelStyle}>Street Address</label>
+                  <Input
+                    {...register("address", { required: "Address is required" })}
+                    className={inputStyle}
+                    placeholder="14, Sea View Road, Bandra West"
+                  />
+                  {errors.address && <p className="text-red-400 text-xs mt-1">{errors.address.message}</p>}
                 </div>
-                <div className="space-y-1">
-                  <label className={labelStyle}>State / Region</label>
-                  <Input {...register("state", { required: "State is required" })} className={inputStyle} placeholder="Maharashtra" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-1">
+                    <label className={labelStyle}>City</label>
+                    <Input {...register("city", { required: "City is required" })} className={inputStyle} placeholder="Mumbai" />
+                    {errors.city && <p className="text-red-400 text-xs mt-1">{errors.city.message}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <label className={labelStyle}>State / Region</label>
+                    <Input {...register("state", { required: "State is required" })} className={inputStyle} placeholder="Maharashtra" />
+                    {errors.state && <p className="text-red-400 text-xs mt-1">{errors.state.message}</p>}
+                  </div>
                 </div>
+                <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5">
+                  <span className="text-amber-500">📍</span>
+                  Your address will be geocoded automatically to enable location-based discovery.
+                </p>
               </div>
             </div>
           </section>

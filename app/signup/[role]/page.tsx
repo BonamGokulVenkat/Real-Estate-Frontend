@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, use } from "react";
 import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Sparkles, Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authService } from "@/services/authService";
@@ -11,24 +11,40 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 
-export default function Login() {
+interface PageProps {
+  params: Promise<{
+    role: "individual" | "builder";
+  }>;
+}
+
+export default function Signup({ params }: PageProps) {
+  const { role } = use(params);
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const setUser = useAuthStore((state) => state.setUser);
   const router = useRouter();
+
+  // Basic validation on the client side
+  if (typeof window !== "undefined" && role !== "individual" && role !== "builder") {
+    router.push("/signup");
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const data = await authService.login({
+      const data = await authService.register({
         email,
         password,
+        name,
+        role,
       });
-      toast.success("Logged in successfully!");
+      toast.success("Account created successfully!");
 
       // Store tokens
       Cookies.set("access_token", data.access_token);
@@ -48,15 +64,16 @@ export default function Login() {
       } else {
         router.push("/");
       }
-
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Authentication failed. Please try again.");
+      toast.error(error.response?.data?.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+
+  const roleDisplay = role === "builder" ? "Builder" : "Individual";
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-[#0A192F] flex items-center justify-center relative overflow-hidden selection:bg-amber-500/30">
@@ -70,6 +87,13 @@ export default function Login() {
         transition={{ duration: 0.6 }}
         className="w-full max-w-md relative z-10 px-4"
       >
+        <Link 
+          href="/signup" 
+          className="inline-flex items-center text-white/40 hover:text-amber-500 text-xs font-bold uppercase tracking-widest transition-colors mb-6"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" /> Change Role
+        </Link>
+
         <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[40px] p-8 md:p-12 border border-white/10 shadow-2xl relative overflow-hidden">
           {/* Subtle Inner Rim */}
           <div className="absolute inset-0 border border-amber-500/5 rounded-[40px] pointer-events-none" />
@@ -78,18 +102,30 @@ export default function Login() {
             <div className="flex items-center justify-center gap-2 mb-4">
               <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
               <span className="text-amber-500 text-[9px] font-bold tracking-[0.4em] uppercase">
-                Members Portal
+                {roleDisplay} Registration
               </span>
             </div>
             <h1 className="font-serif text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Welcome <span className="text-white/40 italic font-light">Back</span>
+              Create <span className="text-white/40 italic font-light">Legacy</span>
             </h1>
             <p className="text-white/30 text-sm font-light leading-relaxed">
-              Access your private portfolio and insights
+              Join our exclusive network of estates as a {roleDisplay.toLowerCase()}
             </p>
           </div>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+              <Input 
+                type="text" 
+                placeholder="Full Name" 
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="h-14 pl-12 bg-white/5 border-white/10 rounded-2xl text-white placeholder:text-white/20 focus-visible:ring-amber-500/20 focus-visible:border-amber-500/50 transition-all" 
+              />
+            </div>
+
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
               <Input 
@@ -123,7 +159,7 @@ export default function Login() {
                 <Loader2 className="w-5 h-5 animate-spin mx-auto" />
               ) : (
                 <>
-                  Enter Portal <ArrowRight className="w-4 h-4 ml-2 inline" />
+                  Establish Account <ArrowRight className="w-4 h-4 ml-2 inline" />
                 </>
               )}
             </Button>
@@ -133,18 +169,18 @@ export default function Login() {
           <div className="mt-10">
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 h-px bg-white/5" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Access</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Registration</span>
               <div className="flex-1 h-px bg-white/5" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <a 
-                href={`${API_URL}/auth/google`}
+                href={`${API_URL}/auth/google?role=${role}`}
                 className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
               >
                 Google
               </a>
               <a 
-                href={`${API_URL}/auth/linkedin`}
+                href={`${API_URL}/auth/linkedin?role=${role}`}
                 className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
               >
                 LinkedIn
@@ -153,12 +189,9 @@ export default function Login() {
           </div>
 
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-white/20 mt-10">
-            Seeking access?{" "}
-            <Link 
-              href="/signup" 
-              className="text-amber-500 hover:text-amber-400 transition-colors ml-1"
-            >
-              Establish Account
+            Registered member?{" "}
+            <Link href="/login" className="text-amber-500 hover:text-amber-400 transition-colors ml-1">
+              Sign In
             </Link>
           </p>
         </div>

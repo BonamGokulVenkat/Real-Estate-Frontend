@@ -56,6 +56,10 @@ export interface CreatePropertyPayload {
 }
 
 export const propertyService = {
+  getCities: async (): Promise<string[]> => {
+  const res = await apiClient.get<string[]>(`/properties/cities`);
+  return res.data;
+},
   getAll: async (): Promise<Property[]> => {
     const response = await apiClient.get<Property[]>('/properties');
     return response.data;

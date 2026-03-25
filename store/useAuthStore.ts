@@ -4,7 +4,8 @@ import { persist } from 'zustand/middleware';
 export type UserRole = 'individual' | 'builder' | 'admin';
 
 export interface UserProfile {
-  id: string;
+  id?: string;       // legacy alias
+  user_id: string;  // canonical ID from backend
   email: string;
   name: string;
   phone?: string;

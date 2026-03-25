@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Sparkles, Building2, Users2, Loader2, MapPin } from "lucide-react";
+import { ArrowRight, Sparkles, Building2, Users2, Loader2, MapPin, LocateFixed } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "@/hooks/useLocation";
 
@@ -28,23 +28,51 @@ const fadeInUp = {
   transition: { duration: 0.8, ease: "easeOut" }
 } as const;
 
+const RADIUS_KM = 250; // search within 250 km
+
 export default function Index() {
-  const { city } = useLocation();
+  const { city, latitude, longitude, isLoading: locationLoading, error: locationError } = useLocation();
+
+  const hasCoords = latitude !== null && longitude !== null;
 
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ['properties', 'featured', city],
+    queryKey: ['properties', 'featured', latitude, longitude, city],
+    enabled: !locationLoading, // wait until location resolves (or errors)
     queryFn: async () => {
-      if (city) {
-        const localProps = await propertyService.search({ location: city, limit: 4 });
-        if (localProps && localProps.length > 0) {
-          return localProps;
-        }
+      // 1. Use precise coordinates (preferred) → radius search
+      if (hasCoords) {
+        const nearby = await propertyService.search({
+          lat: latitude,
+          lng: longitude,
+          radius_km: RADIUS_KM,
+          limit: 8,
+        });
+        if (nearby && nearby.length > 0) return nearby;
       }
-      return propertyService.search({ limit: 4 });
+
+      // 2. Fallback: city-name exact match
+      if (city) {
+        const localProps = await propertyService.search({ city, limit: 8 });
+        if (localProps && localProps.length > 0) return localProps;
+      }
+
+      // 3. Fallback: global latest
+      return propertyService.search({ limit: 8 });
     },
   });
 
   const featured = properties || [];
+
+  // Heading copy based on location state
+  const locationLabel = hasCoords && city
+    ? `Within ${RADIUS_KM} km of ${city}`
+    : hasCoords
+    ? `Within ${RADIUS_KM} km radius`
+    : city
+    ? `Curated for you in ${city}`
+    : "Curated Collection";
+
+
 
   return (
     <div className="bg-[#0A192F] min-h-screen text-white selection:bg-amber-500/30 overflow-x-hidden">
@@ -64,8 +92,12 @@ export default function Index() {
             <div className="flex items-center gap-3">
               <span className="h-[1px] w-8 bg-amber-500/50" />
               <span className="text-amber-500 text-[10px] font-bold tracking-[0.4em] uppercase flex items-center gap-2">
-                {city && <MapPin className="w-3 h-3" />}
-                {city ? `Curated for you in ${city}` : "Curated Collection"}
+                {hasCoords ? (
+                  <LocateFixed className="w-3 h-3" />
+                ) : city ? (
+                  <MapPin className="w-3 h-3" />
+                ) : null}
+                {locationLabel}
               </span>
               <span className="h-[1px] w-8 bg-amber-500/50" />
             </div>
