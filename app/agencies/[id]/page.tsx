@@ -228,7 +228,7 @@ export default function AgencyDetailPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.08, duration: 0.6 }}
                 >
-                  <Link href={`/properties/${property.property_id}`} className="group block">
+                  <Link href={`/property/${property.property_id}`} className="group block">
                     <div className="relative bg-white/[0.04] border border-white/10 rounded-[28px] overflow-hidden hover:border-amber-500/30 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-500">
 
                       {/* Thumbnail */}

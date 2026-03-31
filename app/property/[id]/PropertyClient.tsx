@@ -18,6 +18,7 @@ import {
   Printer,
   Sparkles,
   Loader2,
+  PlayCircle,
 } from "lucide-react";
 
 import PropertyCard from "@/components/common/PropertyCard";
@@ -125,12 +126,19 @@ export default function PropertyClient({
     return <div className="text-white text-center mt-20">Not Found</div>;
   }
 
-  const images =
-  property.media && property.media.length > 0
-    ? property.media.map((m) => m.url).filter(Boolean)
-    : ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9"];
+  // Separate all media into a unified list with type info
+  const mediaItems: { url: string; type: "image" | "video" }[] =
+    property.media && property.media.length > 0
+      ? property.media
+          .filter((m) => m.url)
+          .map((m) => ({
+            url: m.url,
+            type: m.media_type?.startsWith("video") ? "video" : "image",
+          }))
+      : [{ url: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9", type: "image" }];
 
-    console.log("MEDIA FROM BACKEND:", property.media);
+  const activeItem = mediaItems[activeImg];
+
   const related = (relatedProps || []).filter(
     (p) => p.property_id !== property.property_id
   );
@@ -173,37 +181,66 @@ export default function PropertyClient({
                 animate={{ opacity: 1, scale: 1 }}
                 className="relative rounded-[40px] overflow-hidden aspect-[16/9] mb-6 border border-white/10 shadow-2xl group"
               >
-                <Image 
-                  src={images[activeImg] || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9"} 
-                  alt={property.title} 
-                  fill 
-                  className="object-cover transition-transform duration-1000 group-hover:scale-105" 
-                  priority 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F]/60 via-transparent to-transparent" />
+                {activeItem?.type === "video" ? (
+                  <video
+                    key={activeItem.url}
+                    src={activeItem.url}
+                    controls
+                    autoPlay={false}
+                    className="w-full h-full object-cover"
+                    style={{ position: "absolute", inset: 0 }}
+                  />
+                ) : (
+                  <Image 
+                    src={activeItem?.url || "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9"} 
+                    alt={property.title} 
+                    fill 
+                    className="object-cover transition-transform duration-1000 group-hover:scale-105" 
+                    priority 
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F]/60 via-transparent to-transparent pointer-events-none" />
                 
                 <button 
                   onClick={handleFavoriteClick} 
-                  className="absolute top-8 right-8 p-4 rounded-2xl bg-[#0A192F]/60 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all active:scale-90"
+                  className="absolute top-8 right-8 p-4 rounded-2xl bg-[#0A192F]/60 backdrop-blur-xl border border-white/10 hover:bg-white/10 transition-all active:scale-90 z-10"
                 >
                   <Heart className={`w-6 h-6 ${isFavorited ? "fill-amber-500 text-amber-500" : "text-white"}`} />
                 </button>
 
-                <div className="absolute bottom-8 left-8 flex items-center gap-3">
+                <div className="absolute bottom-8 left-8 flex items-center gap-3 z-10">
                   <Badge className="bg-amber-500 text-[#0A192F] font-bold px-4 py-1.5 rounded-lg border-none uppercase text-[10px] tracking-widest">
-                    {activeImg + 1} / {images.length} Photos
+                    {activeImg + 1} / {mediaItems.length} {activeItem?.type === "video" ? "Video" : "Photo"}
                   </Badge>
                 </div>
               </motion.div>
               
+              {/* Thumbnail strip */}
               <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
-                {images.map((img, i) => (
+                {mediaItems.map((item, i) => (
                   <button 
                     key={i} 
                     onClick={() => setActiveImg(i)} 
-                    className={`relative w-32 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 ${activeImg === i ? "border-amber-500 scale-95" : "border-white/5 opacity-40 hover:opacity-100"}`}
+                    className={`relative w-32 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 flex items-center justify-center bg-[#0D2137] ${
+                      activeImg === i ? "border-amber-500 scale-95" : "border-white/5 opacity-40 hover:opacity-100"
+                    }`}
                   >
-                    <Image src={img} alt="" fill className="object-cover" />
+                    {item.type === "video" ? (
+                      <>
+                        <video
+                          src={item.url}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                          <PlayCircle className="w-8 h-8 text-amber-500 drop-shadow-lg" />
+                        </div>
+                      </>
+                    ) : (
+                      <Image src={item.url} alt="" fill className="object-cover" />
+                    )}
                   </button>
                 ))}
               </div>

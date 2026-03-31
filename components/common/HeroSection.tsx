@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, useScroll, useTransform, useSpring } from "framer-motion";
 import { Search, MapPin, Sparkles, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useSearchParams } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import {
   Select,
@@ -18,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
+import { propertyService } from "@/services/propertyService";
 // Optimized Data constants
 const STATS = [
   { value: "200+", label: "Premium Properties" },
@@ -28,39 +29,32 @@ const STATS = [
 
 const PROPERTY_TYPES = ["Villa", "Penthouse", "Apartment", "Townhouse", "Estate"] as const;
 
-const FLOATING_CARDS = [
-  {
-    top: "20%",
-    right: "6%",
-    delay: 0.9,
-    label: "New Listing",
-    price: "$4.2M",
-    loc: "Beverly Hills, CA",
-    tag: "Just Listed",
-    tagColor: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  },
-  {
-    top: "58%",
-    right: "4%",
-    delay: 1.1,
-    label: "Featured",
-    price: "$2.8M",
-    loc: "Manhattan, NY",
-    tag: "Hot Deal",
-    tagColor: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  },
-] as const;
 
 export default function HeroSection() {
+  const router = useRouter();
   const [location, setLocation] = useState("");
+  const searchParams = useSearchParams();
+  const [typeFilter, setTypeFilter] = useState<string>(
+  searchParams.get("type") || "all");
+  const [cityFilter, setCityFilter] = useState<string>(
+  searchParams.get("city") || "all");
   const [propertyType, setPropertyType] = useState("");
   const heroRef = useRef<HTMLDivElement>(null);
-
+  const { data: cities = [] } = useQuery({
+  queryKey: ["property-cities"],
+  queryFn: propertyService.getCities,
+});
   // Parallax logic with smoother spring physics
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if(typeFilter !== "all") params.set("type", typeFilter);
+    if(cityFilter !== "all") params.set("city", cityFilter);
+  }, [typeFilter, cityFilter, router]);
 
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
   
@@ -155,12 +149,19 @@ export default function HeroSection() {
                 {/* Location Input */}
                 <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/5 rounded-xl focus-within:border-amber-500/50 transition-all">
                   <MapPin className="w-4 h-4 text-amber-500" />
-                  <Input
-                    placeholder="Search location..."
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="border-0 bg-transparent text-white placeholder:text-white/30 focus-visible:ring-0 h-auto p-0"
-                  />
+                  <Select value={location} onValueChange={setLocation}>
+                    <SelectTrigger className="border-0 bg-transparent text-white focus:ring-0 shadow-none h-10 px-0 font-light">
+                      <SelectValue placeholder="Select City" />
+                    </SelectTrigger>
+
+                    <SelectContent className="bg-[#0D2137] border-white/10 text-white">
+                      {cities.map((city: string) => (
+                        <SelectItem key={city} value={city}>
+                          {city}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <Separator orientation="vertical" className="hidden md:block bg-white/10 h-10 self-center" />
@@ -182,7 +183,17 @@ export default function HeroSection() {
                   </Select>
                 </div>
 
-                <Button className="md:w-auto w-full h-12 md:h-auto px-8 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-all">
+                <Button
+                  onClick={() => {
+                    const query = new URLSearchParams();
+
+                    if (location) query.append("city", location);
+                    if (propertyType) query.append("type", propertyType);
+                    
+                     router.push(`just-for-you?${query.toString()}`);
+                  }}
+                  className="md:w-auto w-full h-12 md:h-auto px-8 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition-all"
+                >
                   Search
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
@@ -225,38 +236,6 @@ export default function HeroSection() {
         </div>
       </motion.div>
 
-      {/* ── Floating Visual Cards (Desktop Only) ── */}
-      {FLOATING_CARDS.map((card, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 1, delay: card.delay, ease: "easeOut" }}
-          className="absolute hidden xl:block z-20 w-60"
-          style={{ top: card.top, right: card.right }}
-        >
-          <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-5 shadow-2xl hover:bg-white/10 transition-all cursor-default group">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-[10px] uppercase tracking-tighter text-white/40 font-semibold">{card.label}</span>
-              <Badge className={cn("text-[9px] px-2 py-0 border-0", card.tagColor)}>
-                {card.tag}
-              </Badge>
-            </div>
-            <div className="text-2xl font-serif font-bold text-white mb-1 group-hover:text-amber-400 transition-colors">
-              {card.price}
-            </div>
-            <div className="flex items-center gap-1.5 text-white/50 text-xs mb-4">
-              <MapPin className="w-3 h-3 text-amber-500" />
-              {card.loc}
-            </div>
-            <div className="h-px bg-white/10 w-full mb-3" />
-            <div className="flex justify-between items-center text-[10px] text-white/30 uppercase font-bold tracking-widest">
-              <span>View Details</span>
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </div>
-        </motion.div>
-      ))}
     </section>
   );
 }

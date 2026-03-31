@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { SlidersHorizontal, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrency } from "@/hooks/useCurrency";
-
+import { useRouter } from 'next/navigation';
 // Shadcn Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ export default function JustForYou() {
   const [minBeds, setMinBeds] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
   const { formatPrice } = useCurrency();
+  const router = useRouter();
 
   // ── Fetch available cities from DB ─────────────────────────────────────────
   const { data: availableCities = [], isLoading: citiesLoading } = useQuery<string[]>({
@@ -69,6 +70,15 @@ export default function JustForYou() {
     setTypeFilter("all");
     setCityFilter("all");
   };
+  useEffect(()=>{
+    const params = new URLSearchParams();
+    if(typeFilter !== "all") params.set("type", typeFilter);
+    if(cityFilter !== "all") params.set("city", cityFilter);
+    if(maxPrice[0] < 100000000) params.set("max_price", maxPrice[0].toString());
+    if(minBeds > 0) params.set("bedrooms", minBeds.toString());
+    router.push(`?${params.toString()}`);
+  }, [typeFilter, cityFilter, maxPrice, minBeds, router]);
+
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
@@ -309,7 +319,6 @@ export default function JustForYou() {
               </div>
             </div>
           </aside>
-
           {/* ── Property Grid ── */}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-8 px-2">
@@ -322,7 +331,7 @@ export default function JustForYou() {
                 )}
               </span>
             </div>
-
+            
             {isLoading ? (
               <div className="flex justify-center py-20">
                 <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
@@ -343,11 +352,11 @@ export default function JustForYou() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                {filtered.map((p, i) => (
-                  <PropertyCard key={p.property_id} property={p} index={i} />
-                ))}
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                              {filtered.map((p: any, i: number) => (
+                                <PropertyCard key={p.property_id} property={p} index={i} />
+                              ))}
+                </div>
             )}
           </div>
         </div>

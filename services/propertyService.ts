@@ -6,6 +6,7 @@ export type PropertyStatus = 'available' | 'sold' | 'pending';
 export interface PropertyMedia {
   media_id: string;
   media_url: string;
+  url: string;
   media_type: string;
 }
 

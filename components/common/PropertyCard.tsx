@@ -69,7 +69,11 @@ export default function PropertyCard({ property, index }: { property: Property; 
     toggleMutation.mutate();
   };
 
-  const imageUrl = property.media?.[0]?.media_url || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80';
+  const FALLBACK = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&q=80';
+  const firstImage = property.media?.find(
+    (m) => !m.media_type?.startsWith('video')
+  );
+  const imageUrl = firstImage?.url || firstImage?.media_url || FALLBACK;
 
   return (
     <motion.div
