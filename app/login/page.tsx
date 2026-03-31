@@ -56,7 +56,7 @@ export default function Login() {
     }
   };
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-[#0A192F] flex items-center justify-center relative overflow-hidden selection:bg-amber-500/30">

@@ -10,8 +10,7 @@ export async function generateMetadata(
 
   try {
     const apiUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:3000/api/v1";
+      process.env.NEXT_PUBLIC_API_URL;
 
     const res = await fetch(`${apiUrl}/properties/${id}`);
     const data = await res.json();
