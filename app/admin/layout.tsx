@@ -20,13 +20,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
-    } else if (user?.role !== "admin") {
+    } else if (user?.role === "admin") {
+      router.push("/admin");
+    } else {
       router.push("/");
     }
   }, [isAuthenticated, user, router]);
+
+
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     router.push("/login");
+  //   } else {
+  //     router.push("/admin");
+  //   }
+  // }, [isAuthenticated, user, router]);
 
   if (!isAuthenticated || user?.role !== "admin") {
     return null; // Will redirect
