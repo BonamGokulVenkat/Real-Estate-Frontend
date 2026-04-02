@@ -11,12 +11,17 @@ export interface UserProfile {
   phone?: string;
   role: UserRole;
   avatar_url?: string;
+  bio?: string;
+  company_name?: string;
+  specializations?: string[];
+  date_joined?: Date;
 }
 
 interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
   setUser: (user: UserProfile) => void;
+  updateUser: (partial: Partial<UserProfile>) => void;
   logout: () => void;
 }
 
@@ -26,10 +31,14 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       setUser: (user) => set({ user, isAuthenticated: true }),
+      updateUser: (partial) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...partial } : state.user,
+        })),
       logout: () => set({ user: null, isAuthenticated: false }),
     }),
     {
-      name: 'auth-storage', // name of the item in the storage (must be unique)
+      name: 'auth-storage',
     }
   )
 );

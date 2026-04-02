@@ -28,6 +28,7 @@ export interface Property {
     address: string;
     city: string;
     state: string;
+    zipCode: number;
     lat: number;
     lng: number;
   };
@@ -49,6 +50,7 @@ export interface CreatePropertyPayload {
     address: string;
     city: string;
     state: string;
+    zipCode: number;
     lat: number;
     lng: number;
   };
@@ -61,6 +63,10 @@ export const propertyService = {
   const res = await apiClient.get<string[]>(`/properties/cities`);
   return res.data;
 },
+  getStats: async (): Promise<{ totalProperties: number; totalBuilders: number; totalCities: number }> => {
+    const res = await apiClient.get<{ totalProperties: number; totalBuilders: number; totalCities: number }>('/properties/stats');
+    return res.data;
+  },
   getAll: async (): Promise<Property[]> => {
     const response = await apiClient.get<Property[]>('/properties');
     return response.data;
@@ -85,3 +91,4 @@ export const propertyService = {
     await apiClient.delete(`/properties/${id}`);
   }
 };
+

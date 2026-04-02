@@ -18,10 +18,13 @@ import {
   Loader2,
   AlertCircle,
   PackageOpen,
+  Star,
+  TrendingUp,
+  Home,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 interface PropertyMedia {
   media_id: string;
@@ -50,22 +53,17 @@ interface Builder {
   email: string;
   phone?: string;
   date_joined: string;
+  avatar_url?: string;
+  bio?: string;
+  company_name?: string;
+  specializations?: string[];
   properties: Property[];
-}
-
-function formatPrice(price: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 export default function AgencyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { currency } = useCurrency();
-
+  const { formatPrice } = useCurrency();
   const [builder, setBuilder] = useState<Builder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +115,18 @@ export default function AgencyDetailPage() {
     month: "long",
   });
 
+  const propertyTypes = [...new Set(builder.properties.map((p) => p.property_type))];
+  const avgPrice =
+  builder.properties.length > 0
+    ? builder.properties.reduce((sum, p) => {
+        const price = Number(p.price);
+
+        if (!price || isNaN(price) || !isFinite(price)) return sum;
+
+        return sum + price;
+      }, 0) / builder.properties.length
+    : 0;
+
   const initials = builder.name
     .split(" ")
     .map((n) => n[0])
@@ -126,7 +136,9 @@ export default function AgencyDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#0A192F] text-white">
+      {/* Atmospheric glows */}
       <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-8 pt-32 pb-24 relative z-10">
 
@@ -135,26 +147,30 @@ export default function AgencyDetailPage() {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-white/40 hover:text-amber-500 transition-colors mb-12 text-sm font-medium"
+          className="flex items-center gap-2 text-white/40 hover:text-amber-500 transition-colors mb-12 text-sm font-medium group"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
           Back to Agencies
         </motion.button>
 
-        {/* Builder Hero */}
+        {/* ── Builder Hero Card ── */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="relative bg-white/[0.04] border border-white/10 rounded-[40px] p-10 md:p-14 mb-16 overflow-hidden"
+          className="relative bg-white/[0.04] border border-white/10 rounded-[40px] p-10 md:p-14 mb-10 overflow-hidden"
         >
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/5 rounded-full blur-[80px]" />
 
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-8 relative z-10">
+          <div className="flex flex-col md:flex-row items-start gap-8 relative z-10">
             {/* Avatar */}
             <div className="relative shrink-0">
-              <div className="w-24 h-24 bg-amber-500 rounded-3xl flex items-center justify-center font-serif font-bold text-4xl text-[#0A192F] select-none">
-                {initials}
+              <div className="w-24 h-24 rounded-3xl overflow-hidden border-2 border-white/10 bg-[#0D2137] flex items-center justify-center shadow-2xl">
+                {builder.avatar_url ? (
+                  <img src={builder.avatar_url} alt={builder.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="font-serif font-bold text-4xl text-amber-500 select-none">{initials}</span>
+                )}
               </div>
               <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-[#0A192F] border border-amber-500/30 rounded-xl flex items-center justify-center">
                 <Building2 className="w-4 h-4 text-amber-500" />
@@ -163,8 +179,25 @@ export default function AgencyDetailPage() {
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <h1 className="font-serif text-4xl md:text-5xl font-bold mb-4">{builder.name}</h1>
-              <div className="flex flex-wrap items-center gap-4">
+              {/* Name + badges */}
+              <div className="flex flex-wrap items-center gap-3 mb-3">
+                <h1 className="font-serif text-4xl md:text-5xl font-bold">{builder.name}</h1>
+                <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-[0.3em] rounded-full flex items-center gap-1">
+                  <Star className="w-2.5 h-2.5 fill-emerald-400" />
+                  Verified Builder
+                </span>
+              </div>
+
+              {/* Company name */}
+              {builder.company_name && (
+                <p className="text-amber-500/80 font-semibold text-lg mb-3 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  {builder.company_name}
+                </p>
+              )}
+
+              {/* Contact row */}
+              <div className="flex flex-wrap items-center gap-4 mb-4">
                 {builder.email && (
                   <span className="flex items-center gap-2 text-white/40 text-sm">
                     <Mail className="w-4 h-4 text-amber-500/70" />
@@ -182,38 +215,88 @@ export default function AgencyDetailPage() {
                   Member since {joined}
                 </span>
               </div>
+
+              {/* Specialization tags */}
+              {builder.specializations && builder.specializations.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {builder.specializations.map((s) => (
+                    <span
+                      key={s}
+                      className="px-3 py-1 bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold uppercase tracking-wider rounded-full"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Property type tags */}
+              {propertyTypes.length > 0 && (
+                <div className="flex gap-2 flex-wrap mt-3">
+                  {propertyTypes.map((type) => (
+                    <span
+                      key={type}
+                      className="px-3 py-1 bg-amber-500/5 border border-amber-500/10 rounded-full text-xs text-amber-500/60 capitalize"
+                    >
+                      {type}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Listing count */}
-            <div className="shrink-0 bg-white/5 border border-white/10 rounded-2xl px-8 py-6 text-center">
-              <p className="text-4xl font-serif font-bold text-amber-500">{builder.properties.length}</p>
-              <p className="text-white/40 text-xs uppercase tracking-widest font-bold mt-1">Total Listings</p>
+            {/* Stats panel */}
+            <div className="shrink-0 grid grid-cols-2 gap-4 md:grid-cols-1 w-full md:w-auto">
+              <div className="bg-white/[0.04] border border-white/10 rounded-2xl px-7 py-5 text-center">
+                <p className="text-3xl font-serif font-bold text-amber-500 tabular-nums">{builder.properties.length}</p>
+                <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mt-1">Listings</p>
+              </div>
+              {avgPrice > 0 && (
+                <div className="bg-white/[0.04] border border-white/10 rounded-2xl px-7 py-5 text-center">
+                  <p className="text-lg font-serif font-bold text-amber-500 tabular-nums">{formatPrice(avgPrice)}</p>
+                  <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mt-1">Avg. Price</p>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>
 
-        {/* Section heading */}
-        <div className="flex items-center gap-4 mb-4">
+        {/* ── About Section ── */}
+        {builder.bio && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white/[0.02] border border-white/10 rounded-[32px] p-8 mb-10"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <span className="h-[1px] w-8 bg-amber-500/50" />
+              <span className="text-amber-500 text-[10px] font-bold tracking-[0.4em] uppercase">About</span>
+            </div>
+            <p className="text-white/60 leading-relaxed text-base font-light font-serif italic max-w-3xl">
+              &ldquo;{builder.bio}&rdquo;
+            </p>
+          </motion.div>
+        )}
+
+        {/* ── Properties ── */}
+        <div className="flex items-center gap-4 mb-4 mt-12">
           <span className="h-[1px] w-8 bg-amber-500/50" />
           <span className="text-amber-500 text-[10px] font-bold tracking-[0.4em] uppercase">Portfolio</span>
         </div>
         <h2 className="font-serif text-3xl md:text-4xl font-bold mb-12">Properties Listed</h2>
 
-        {/* No listings */}
-        {builder.properties.length === 0 && (
+        {builder.properties.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center py-28 gap-6 bg-white/[0.02] border border-white/5 rounded-[40px]"
           >
             <PackageOpen className="w-16 h-16 text-white/10" />
-            <p className="text-white/30 text-xl font-serif font-light">There are no listings yet!</p>
+            <p className="text-white/30 text-xl font-serif font-light">No listings yet!</p>
             <p className="text-white/20 text-sm">Check back soon for upcoming properties by this builder.</p>
           </motion.div>
-        )}
-
-        {/* Properties Grid */}
-        {builder.properties.length > 0 && (
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {builder.properties.map((property, index) => {
               const thumbnail = property.media?.find((m) => m.media_type === "image")?.url;
@@ -256,7 +339,7 @@ export default function AgencyDetailPage() {
                         </div>
                         {/* Price */}
                         <div className="absolute bottom-4 right-4 bg-[#0A192F]/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-amber-400 font-bold text-sm border border-white/5">
-                          {formatPrice(property.price, currency)}
+                          {formatPrice(property.price)}
                         </div>
                       </div>
 
@@ -265,12 +348,10 @@ export default function AgencyDetailPage() {
                         <h3 className="font-serif text-lg font-bold text-white group-hover:text-amber-400 transition-colors mb-2 line-clamp-1">
                           {property.title}
                         </h3>
-
                         <p className="flex items-center gap-1.5 text-white/40 text-sm mb-4">
                           <MapPin className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
                           {location}
                         </p>
-
                         <div className="flex items-center gap-4 text-white/30 text-xs pt-4 border-t border-white/5">
                           {property.bedrooms != null && (
                             <span className="flex items-center gap-1">
@@ -303,7 +384,6 @@ export default function AgencyDetailPage() {
             })}
           </div>
         )}
-
       </div>
     </div>
   );

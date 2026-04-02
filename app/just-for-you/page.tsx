@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { SlidersHorizontal, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrency } from "@/hooks/useCurrency";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 // Shadcn Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,17 +23,42 @@ import { Separator } from "@/components/ui/separator";
 import PropertyCard from "@/components/common/PropertyCard";
 import { propertyService, Property } from "@/services/propertyService";
 
-const types = ["all", "villa", "apartment", "penthouse", "townhouse", "mansion"] as const;
+const types = ["all", "villa", "apartment", "house", "land", "commercial"] as const;
 
 export default function JustForYou() {
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [cityFilter, setCityFilter] = useState<string>("all");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // ── Initialize filters from URL params (from hero search) ─────────────────
+  const [typeFilter, setTypeFilter] = useState<string>(
+    searchParams.get("type") || "all"
+  );
+  const [cityFilter, setCityFilter] = useState<string>(
+    searchParams.get("city") || "all"
+  );
   const [sortBy, setSortBy] = useState<string>("newest");
-  const [maxPrice, setMaxPrice] = useState<number[]>([50000000]);
+  const [maxPrice, setMaxPrice] = useState<number[]>([100000000]);
   const [minBeds, setMinBeds] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
   const { formatPrice } = useCurrency();
-  const router = useRouter();
+
+  // ── Sync URL params → state when URL changes (e.g. browser back/forward) ──
+  useEffect(() => {
+    const type = searchParams.get("type");
+    const city = searchParams.get("city");
+    if (type) setTypeFilter(type);
+    if (city) setCityFilter(city);
+  }, [searchParams]);
+
+  // ── Update URL when filters change (replace, not push, to avoid history spam) ─
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (typeFilter !== "all") params.set("type", typeFilter);
+    if (cityFilter !== "all") params.set("city", cityFilter);
+    if (maxPrice[0] < 100000000) params.set("max_price", maxPrice[0].toString());
+    if (minBeds > 0) params.set("bedrooms", minBeds.toString());
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [typeFilter, cityFilter, maxPrice, minBeds]);
 
   // ── Fetch available cities from DB ─────────────────────────────────────────
   const { data: availableCities = [], isLoading: citiesLoading } = useQuery<string[]>({
@@ -70,17 +95,8 @@ export default function JustForYou() {
     setTypeFilter("all");
     setCityFilter("all");
   };
-  useEffect(()=>{
-    const params = new URLSearchParams();
-    if(typeFilter !== "all") params.set("type", typeFilter);
-    if(cityFilter !== "all") params.set("city", cityFilter);
-    if(maxPrice[0] < 100000000) params.set("max_price", maxPrice[0].toString());
-    if(minBeds > 0) params.set("bedrooms", minBeds.toString());
-    router.push(`?${params.toString()}`);
-  }, [typeFilter, cityFilter, maxPrice, minBeds, router]);
-
-
   return (
+
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
       {/* Background Glows */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />

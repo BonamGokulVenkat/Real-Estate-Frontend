@@ -33,31 +33,60 @@ export const useCurrency = () => {
     return () => clearInterval(interval);
   }, [setRates]);
 
-  // Formats price from base INR to selected currency
-  const formatPrice = (priceInINR: number) => {
+  // Returns the raw converted price in the selected currency
+  const getConvertedPrice = (priceInINR: number) => {
+    if (!priceInINR || isNaN(priceInINR) || !isFinite(priceInINR)) {
+      return 0;
+    }
+
     const rate = rates[currency] || 1;
-    const convertedPrice = priceInINR * rate;
 
-    // Formatting rules based on currency logic
-    if (currency === 'INR') {
-      if (convertedPrice >= 10000000) return `₹${(convertedPrice / 10000000).toFixed(2)} Cr`;
-      if (convertedPrice >= 100000) return `₹${(convertedPrice / 100000).toFixed(2)} L`;
-      return `₹${convertedPrice.toLocaleString('en-IN')}`;
+    let converted = priceInINR * rate;
+
+    // 🔥 fix floating precision
+    converted = Number(converted.toFixed(2));
+
+    // 🚨 prevent insane values
+    if (converted > 1e15) {
+      console.warn("Overflow detected:", converted);
+      return 0;
     }
 
-    const formatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      maximumFractionDigits: 0,
-    });
-
-    if (currency === 'USD' || currency === 'EUR' || currency === 'GBP') {
-      if (convertedPrice >= 1000000) return `${formatter.format(convertedPrice / 1000000)}M`;
-      if (convertedPrice >= 1000) return `${formatter.format(convertedPrice / 1000)}k`;
-    }
-
-    return formatter.format(convertedPrice);
+    return converted;
   };
 
-  return { currency, setCurrency, formatPrice, rates };
+  // Formats price from base INR to selected currency
+ const formatPrice = (priceInINR: number) => {
+  const convertedPrice = getConvertedPrice(priceInINR);
+
+  if (!convertedPrice) return "₹0";
+
+  if (currency === 'INR') {
+    if (convertedPrice >= 1e7)
+      return `₹${(convertedPrice / 1e7).toFixed(2)} Cr`;
+
+    if (convertedPrice >= 1e5)
+      return `₹${(convertedPrice / 1e5).toFixed(2)} L`;
+
+    return `₹${Math.round(convertedPrice).toLocaleString('en-IN')}`;
+  }
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  });
+
+  if (['USD', 'EUR', 'GBP'].includes(currency)) {
+    if (convertedPrice >= 1e6)
+      return `${formatter.format(convertedPrice / 1e6)}M`;
+
+    if (convertedPrice >= 1e3)
+      return `${formatter.format(convertedPrice / 1e3)}k`;
+  }
+
+  return formatter.format(convertedPrice);
+};
+
+  return { currency, setCurrency, formatPrice, rates, getConvertedPrice };
 };

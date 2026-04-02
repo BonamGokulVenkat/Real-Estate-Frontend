@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, User, Heart, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
+import { Menu, User, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
@@ -32,11 +32,17 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const { currency, setCurrency } = useCurrency();
   const CURRENCIES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
 
   const { user, isAuthenticated, logout } = useAuthStore();
+
+  // Wait for client-side hydration before reading persisted auth state
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Filter nav links: hide "Sell Property" for individual users
   const visibleNavLinks = NAV_LINKS.filter((link) => {
@@ -56,6 +62,9 @@ export default function Navbar() {
     Cookies.remove("refresh_token");
     setProfileOpen(false);
   };
+
+  // Use hydrated auth values only after mount to avoid SSR mismatch
+  const isLoggedIn = mounted && isAuthenticated && !!user;
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -134,7 +143,7 @@ export default function Navbar() {
 
               {/* Sidebar Footer */}
               <div className="p-6 border-t border-white/5 bg-black/20 space-y-3">
-                {isAuthenticated && user ? (
+                {isLoggedIn ? (
                   <>
                     <div className="flex items-center gap-3 px-2 mb-2">
                       <ProfileAvatar size="lg" />
@@ -191,9 +200,6 @@ export default function Navbar() {
                       ))}
                     </select>
                   </div>
-                  <Link href="/favorites" className="text-white/30 hover:text-amber-500 transition-colors">
-                    <Heart className="w-6 h-6" />
-                  </Link>
                 </div>
               </div>
             </SheetContent>
@@ -237,7 +243,7 @@ export default function Navbar() {
           "shrink-0 transition-opacity duration-300 lg:hidden",
           isOpen ? "opacity-0" : "opacity-100"
         )}>
-          {isAuthenticated && user ? (
+          {isLoggedIn ? (
             <Link href="/profile">
               <ProfileAvatar size="sm" />
             </Link>
@@ -271,12 +277,8 @@ export default function Navbar() {
             </div>
           </div>
 
-          <Link href="/favorites" className="text-white/60 hover:text-amber-500 transition-colors">
-            <Heart className="w-5 h-5" />
-          </Link>
-
           {/* Auth Section */}
-          {isAuthenticated && user ? (
+          {isLoggedIn ? (
             <div className="relative">
               <button
                 onClick={() => setProfileOpen((prev) => !prev)}
@@ -304,14 +306,6 @@ export default function Navbar() {
                     >
                       <User className="w-4 h-4 text-amber-500" />
                       My Profile
-                    </Link>
-                    <Link
-                      href="/favorites"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 text-sm transition-colors"
-                    >
-                      <Heart className="w-4 h-4 text-amber-500" />
-                      My Favorites
                     </Link>
                     <button
                       onClick={handleLogout}

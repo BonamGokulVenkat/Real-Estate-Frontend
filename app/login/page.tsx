@@ -136,19 +136,14 @@ export default function Login() {
               <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Access</span>
               <div className="flex-1 h-px bg-white/5" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <a 
                 href={`${API_URL}/auth/google`}
                 className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
               >
                 Google
               </a>
-              <a 
-                href={`${API_URL}/auth/linkedin`}
-                className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
-              >
-                LinkedIn
-              </a>
+              
             </div>
           </div>
 

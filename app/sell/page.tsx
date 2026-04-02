@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Country, State, City } from "country-state-city";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
@@ -13,6 +14,9 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
+import TagInput from "@/components/common/ui/TagInputProps";
+import { useCurrency } from "@/hooks/useCurrency";
+import { Controller } from "react-hook-form";
 
 interface SellForm {
   title: string;
@@ -25,6 +29,8 @@ interface SellForm {
   address: string;
   city: string;
   state: string;
+  zipCode: string;
+  features: string[]
 }
 
 export default function Sell() {
@@ -33,7 +39,25 @@ export default function Sell() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { formatPrice , currency , setCurrency } = useCurrency();
+  const [countries, setCountries] = useState<any[]>([]);
+  const [states, setStates] = useState<any[]>([]);
+  const [cities, setCities] = useState<any[]>([]);
 
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [manualCity, setManualCity] = useState(""); 
+  
+
+   const {
+    register,
+    handleSubmit,
+    watch,
+    reset,
+    control,
+    formState: { errors },
+  } = useForm<SellForm>();
   // ── Role guard: only builders may access this page ───────────────────────
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "builder") {
@@ -42,17 +66,32 @@ export default function Sell() {
     }
   }, [isAuthenticated, user, router]);
 
+  
+  useEffect(() => {
+    setCountries(Country.getAllCountries());
+  }, []);
+  
+  useEffect(() => {
+  if (selectedCountry && selectedState) {
+    const cityList = City.getCitiesOfState(selectedCountry, selectedState);
+    setCities(cityList);
+  }
+}, [selectedCountry, selectedState]);
+  
+  const handleCountryChange = (code : string) => {
+    setSelectedCountry(code);
+    setStates(State.getStatesOfCountry(code));
+    setCities([]);
+  };
+
   // Render nothing while redirecting
   if (!isAuthenticated || user?.role !== "builder") return null;
 
+  const handleStateChange = (code: string) => {
+    setSelectedState(code);
+  };
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    reset,
-    formState: { errors },
-  } = useForm<SellForm>();
+ 
 
   const currentPrice = watch("price");
 
@@ -120,7 +159,7 @@ export default function Sell() {
       let lng = 0;
       try {
         const addressQuery = encodeURIComponent(
-          [data.address, data.city, data.state].filter(Boolean).join(", ")
+          [data.address, data.city, data.state, data.zipCode].filter(Boolean).join(", ")
         );
         const geoRes = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${addressQuery}&limit=1`,
@@ -150,12 +189,13 @@ export default function Sell() {
         price: Number(data.price),
         location: {
           address: data.address,
-          city: data.city,
-          state: data.state,
+          city: manualCity || data.city,
+          state: selectedState || data.state,
+          zipCode: data.zipCode,
           lat,
           lng,
         },
-        features: ["Premium Finish", "High Ceilings"],
+        features: data.features,
         status: "available" as PropertyStatus,
         media: uploadedMedia,
         builder: { user_id: user.user_id }
@@ -235,17 +275,36 @@ export default function Sell() {
                     <option value="Penthouse" className="bg-[#0D2137]">Penthouse</option>
                     <option value="Mansion" className="bg-[#0D2137]">Mansion</option>
                     <option value="Apartment" className="bg-[#0D2137]">Apartment</option>
+                    <option value="Townhouse" className="bg-[#0D2137]">Townhouse</option>
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className={labelStyle}>Asking Price (INR)</label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/50" />
-                    <Input {...register("price", { required: "Price is required" })} type="number" className={`${inputStyle} pl-12`} placeholder="120000000" />
+                  <label className={labelStyle}>Asking Price (in INR)</label>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
+                    <div className="space-y-2 w-18">
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value as any)}
+                      className={`${inputStyle} w-full px-3 appearance-none`}
+                    >
+                      <option value="INR" className="bg-[#0D2137]">₹ INR</option>
+                      <option value="USD" className="bg-[#0D2137]">$ USD</option>
+                      <option value="EUR" className="bg-[#0D2137]">€ EUR</option>
+                      <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
+                      <option value="AED" className="bg-[#0D2137]">AED</option>
+                    </select>
+                    </div>
+                    <div className="space-y-1 w-58">
+                      <Input {...register("price", { required: "Price is required" })} type="number" className={`${inputStyle} pl-12`} placeholder="120000000" />
+                    </div>
                   </div>
                   {currentPrice > 0 && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      Estimate: {currentPrice >= 10000000 ? `${(currentPrice / 10000000).toFixed(2)} Cr` : `${(currentPrice / 100000).toFixed(2)} Lakh`}
+                      {currentPrice > 0 && (
+                        <span className="text-amber-500 text-xs mt-2">
+                          Estimated: {formatPrice(currentPrice)} 
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>
@@ -286,22 +345,92 @@ export default function Sell() {
                   {errors.address && <p className="text-red-400 text-xs mt-1">{errors.address.message}</p>}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+                  {/* Country */}
+                  <div className="space-y-1">
+                    <label className={labelStyle}>Country</label>
+                    <select
+                      onChange={(e) => handleCountryChange(e.target.value)}
+                      className={`${inputStyle} w-full px-3`}
+                    >
+                      <option className="bg-[#0D2137]">Select Country</option>
+                      {countries.map((c) => (
+                      <option key={c.isoCode} value={c.isoCode} className="bg-[#0D2137]">
+                        {c.name}
+                      </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* State */}
+                  <div className="space-y-1">
+                    <label className={labelStyle}>State</label>
+                    <select
+                      onChange={(e) => handleStateChange(e.target.value)}
+                      className={`${inputStyle} w-full px-3`}
+                    >
+                      <option className="bg-[#0D2137]">Select State</option>
+                      {states.map((s) => (
+                        <option key={s.isoCode} value={s.isoCode} className="bg-[#0D2137]">
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* City */}
                   <div className="space-y-1">
                     <label className={labelStyle}>City</label>
-                    <Input {...register("city", { required: "City is required" })} className={inputStyle} placeholder="Mumbai" />
-                    {errors.city && <p className="text-red-400 text-xs mt-1">{errors.city.message}</p>}
+
+                    <select
+                      {...register("city")}
+                      disabled = {!selectedState}
+                      className={`${inputStyle} w-full px-3`}
+                    >
+                      <option value="" className="bg-[#0D2137]">Select City</option>
+                      {cities.map((c) => (
+                        <option key={c.name} value={c.name} className="bg-[#0D2137]">
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Manual fallback */}
+                    <input
+                      type="text"
+                      placeholder="Or enter manually"
+                      value={manualCity}
+                      onChange={(e) => setManualCity(e.target.value)}
+                      className="w-full mt-2 bg-white/5 border border-white/10 p-2 rounded-xl text-sm"
+                    />
                   </div>
-                  <div className="space-y-1">
-                    <label className={labelStyle}>State / Region</label>
-                    <Input {...register("state", { required: "State is required" })} className={inputStyle} placeholder="Maharashtra" />
-                    {errors.state && <p className="text-red-400 text-xs mt-1">{errors.state.message}</p>}
+
                   </div>
-                </div>
                 <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5">
                   <span className="text-amber-500">📍</span>
                   Your address will be geocoded automatically to enable location-based discovery.
                 </p>
+
+                <div className="space-y-8">
+                <div className="space-y-1">
+                  <label className={labelStyle}>Features</label>
+                  <Controller
+                      name="features"
+                      control={control}
+                      defaultValue={[]}
+                      render={({ field }) => (
+                        <TagInput
+                          value={field.value || []}
+                          onChange={field.onChange}
+                        />
+                      )}
+                    />
+                  {errors.features && <p className="text-red-400 text-xs mt-1">{errors.features.message}</p>}
+                </div>
+
+                </div>
+                
               </div>
             </div>
           </section>
@@ -330,7 +459,7 @@ export default function Sell() {
               <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
               <Upload className="w-12 h-12 text-white/20 mx-auto mb-6 group-hover:text-amber-500 group-hover:scale-110 transition-all duration-500" />
               <p className="text-white font-serif text-lg italic group-hover:text-white transition-colors">Click to upload architectural photography</p>
-              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">High-resolution JPEG or PNG MAX 15</p>
+              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">High-resolution JPEG's and Videos MAX 30 MB</p>
             </div>
 
             {files.length > 0 && (
