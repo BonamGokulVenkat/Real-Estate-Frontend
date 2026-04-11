@@ -1,5 +1,6 @@
 "use client";
-
+import React from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Sparkles, Users2, Loader2, MapPin, LocateFixed } from "lucide-react";
@@ -178,7 +179,7 @@ export default function Index() {
                 <AgencyCard
                   key={builder.user_id || builder.id}
                   agency={{
-                    id: builder.user_id || builder.id,
+                    id: builder.user_id ?? builder.id ?? "",
                     name: builder.name,
                     email: builder.email,
                     phone: builder.phone,

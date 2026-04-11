@@ -1,8 +1,9 @@
 "use client";
 
+import React from "react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Menu, User, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export default function Navbar() {
 
   const { user, isAuthenticated, logout } = useAuthStore();
   const profileRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Fix: Close profile dropdown when clicking outside
   useEffect(() => {
@@ -63,6 +65,8 @@ export default function Navbar() {
     Cookies.remove("access_token");
     Cookies.remove("refresh_token");
     setProfileOpen(false);
+    // Using window.location.href for a full reload to clear all state definitely
+    window.location.href = "/login";
   };
 
   // Logic remains same, but ensures variables are stable
