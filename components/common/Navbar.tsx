@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, User, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
@@ -38,19 +38,21 @@ export default function Navbar() {
   const CURRENCIES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
 
   const { user, isAuthenticated, logout } = useAuthStore();
+  const profileRef = useRef<HTMLDivElement>(null);
 
-  // Wait for client-side hydration before reading persisted auth state
+  // Fix: Close profile dropdown when clicking outside
   useEffect(() => {
-    setMounted(true);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter nav links: hide "Sell Property" for individual users
-  const visibleNavLinks = NAV_LINKS.filter((link) => {
-    if (link.path === "/sell" && user?.role === "individual") return false;
-    return true;
-  });
-
   useEffect(() => {
+    setMounted(true);
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -63,7 +65,14 @@ export default function Navbar() {
     setProfileOpen(false);
   };
 
-  // Use hydrated auth values only after mount to avoid SSR mismatch
+  // Logic remains same, but ensures variables are stable
+  const visibleNavLinks = NAV_LINKS.filter((link) => {
+    if (link.path === "/sell") {
+      return user?.role !== "individual" && user?.role !== "admin";
+    }
+    return true;
+  });
+
   const isLoggedIn = mounted && isAuthenticated && !!user;
 
   const initials = user?.name
@@ -72,7 +81,7 @@ export default function Navbar() {
 
   const ProfileAvatar = ({ size = "sm" }: { size?: "sm" | "lg" }) => (
     <div className={cn(
-      "rounded-full bg-amber-500 flex items-center justify-center font-bold text-[#0A192F] select-none",
+      "rounded-full bg-amber-500 flex items-center justify-center font-bold text-[#0A192F] select-none shrink-0",
       size === "sm" ? "w-9 h-9 text-sm" : "w-12 h-12 text-base"
     )}>
       {initials}
@@ -106,7 +115,6 @@ export default function Navbar() {
                 <SheetDescription>Access main pages and account settings</SheetDescription>
               </VisuallyHidden.Root>
 
-              {/* Sidebar Header */}
               <div className="p-6 flex items-center justify-between border-b border-white/5 bg-[#0A192F]">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-amber-500 rounded flex items-center justify-center">
@@ -119,7 +127,7 @@ export default function Navbar() {
                 </SheetClose>
               </div>
 
-              <div className="flex-1 py-8 px-4 space-y-2">
+              <div className="flex-1 py-8 px-4 space-y-2 overflow-y-auto">
                 {visibleNavLinks.map((link) => {
                   const isActive = pathname === link.path;
                   return (
@@ -141,7 +149,6 @@ export default function Navbar() {
                 })}
               </div>
 
-              {/* Sidebar Footer */}
               <div className="p-6 border-t border-white/5 bg-black/20 space-y-3">
                 {isLoggedIn ? (
                   <>
@@ -265,6 +272,7 @@ export default function Navbar() {
               {CURRENCIES.map(code => (
                 <button
                   key={code}
+                  type="button"
                   onClick={() => setCurrency(code)}
                   className={cn(
                     "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-white/10",
@@ -279,8 +287,9 @@ export default function Navbar() {
 
           {/* Auth Section */}
           {isLoggedIn ? (
-            <div className="relative">
+            <div className="relative" ref={profileRef}>
               <button
+                type="button"
                 onClick={() => setProfileOpen((prev) => !prev)}
                 className="flex items-center gap-2 focus:outline-none"
               >
@@ -293,7 +302,7 @@ export default function Navbar() {
               </button>
 
               {profileOpen && (
-                <div className="absolute top-full right-0 mt-3 w-52 bg-[#0A192F]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div className="absolute top-full right-0 mt-3 w-52 bg-[#0A192F]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[110]">
                   <div className="p-4 border-b border-white/5">
                     <p className="text-white font-semibold text-sm truncate">{user.name}</p>
                     <p className="text-white/40 text-xs truncate">{user.email}</p>
@@ -308,6 +317,7 @@ export default function Navbar() {
                       My Profile
                     </Link>
                     <button
+                      type="button"
                       onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm transition-colors mt-1"
                     >
