@@ -15,6 +15,10 @@ export interface UserProfile {
   company_name?: string;
   specializations?: string[];
   date_joined?: Date;
+  plan?: string;
+  propertyLimit?: number;
+  propertiesPosted?: number;
+  subscriptionExpiresAt?: string | Date;
 }
 
 interface AuthState {

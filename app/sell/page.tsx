@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Country, State, City } from "country-state-city";
 import { Input } from "@/components/ui/input";
+import { GeoapifyAutocomplete } from "@/components/common/ui/GeoapifyAutocomplete";
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -40,15 +40,9 @@ export default function Sell() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { formatPrice , currency , setCurrency } = useCurrency();
-  const [countries, setCountries] = useState<any[]>([]);
-  const [states, setStates] = useState<any[]>([]);
-  const [cities, setCities] = useState<any[]>([]);
-
-  const [selectedCountry, setSelectedCountry] = useState("");
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
   const [selectedState, setSelectedState] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
-  const [manualCity, setManualCity] = useState(""); 
-  
 
    const {
     register,
@@ -56,6 +50,7 @@ export default function Sell() {
     watch,
     reset,
     control,
+    setValue,
     formState: { errors },
   } = useForm<SellForm>();
   // ── Role guard: only builders may access this page ───────────────────────
@@ -63,33 +58,14 @@ export default function Sell() {
     if (!isAuthenticated || user?.role !== "builder") {
       toast.error("Only registered builders can list properties.");
       router.replace("/");
+    } else if (user.plan === "FREE" && (user.propertiesPosted || 0) >= (user.propertyLimit ?? 1)) {
+      toast.error("Property limit reached. Please upgrade to continue.");
+      router.push("/subscription");
     }
   }, [isAuthenticated, user, router]);
 
-  
-  useEffect(() => {
-    setCountries(Country.getAllCountries());
-  }, []);
-  
-  useEffect(() => {
-  if (selectedCountry && selectedState) {
-    const cityList = City.getCitiesOfState(selectedCountry, selectedState);
-    setCities(cityList);
-  }
-}, [selectedCountry, selectedState]);
-  
-  const handleCountryChange = (code : string) => {
-    setSelectedCountry(code);
-    setStates(State.getStatesOfCountry(code));
-    setCities([]);
-  };
-
   // Render nothing while redirecting
   if (!isAuthenticated || user?.role !== "builder") return null;
-
-  const handleStateChange = (code: string) => {
-    setSelectedState(code);
-  };
 
  
 
@@ -152,27 +128,8 @@ export default function Sell() {
         });
       }
 
-      toast.loading("Locating property on map...", { id: toastId });
-
-      // ── Geocode the address via Nominatim (OpenStreetMap, no API key needed) ──
-      let lat = 0;
-      let lng = 0;
-      try {
-        const addressQuery = encodeURIComponent(
-          [data.address, data.city, data.state, data.zipCode].filter(Boolean).join(", ")
-        );
-        const geoRes = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${addressQuery}&limit=1`,
-          { headers: { "Accept-Language": "en-US,en;q=0.9" } }
-        );
-        const geoData = await geoRes.json();
-        if (!geoData || geoData.length === 0) {
-          throw new Error("Could not find the location. Please check the address, city, and state.");
-        }
-        lat = parseFloat(geoData[0].lat);
-        lng = parseFloat(geoData[0].lon);
-      } catch (geoErr: any) {
-        toast.error(geoErr.message || "Geocoding failed. Please enter a valid address.", { id: toastId });
+      if (lat === null || lng === null) {
+        toast.error("Please select a valid location from suggestions", { id: toastId });
         setIsSubmitting(false);
         return;
       }
@@ -189,7 +146,7 @@ export default function Sell() {
         price: Number(data.price),
         location: {
           address: data.address,
-          city: manualCity || data.city,
+          city: data.city,
           state: selectedState || data.state,
           zipCode: data.zipCode,
           lat,
@@ -204,12 +161,26 @@ export default function Sell() {
       const property = await propertyService.create(payload as any);
       
       toast.success("Estate listed successfully!", { id: toastId });
+      
+      // Update local store state to reflect the new property count
+      if (user) {
+        useAuthStore.getState().updateUser({
+          propertiesPosted: (user.propertiesPosted || 0) + 1
+        });
+      }
+
       reset();
       setFiles([]);
       router.push(`/property/${property.property_id}`);
 
     } catch (error: any) {
-      toast.error(error.message || "Failed to list property.", { id: toastId });
+      if (error.response?.status === 409 || error.response?.data?.message === "LIMIT_REACHED" || error.message?.includes("LIMIT_REACHED")) {
+        toast.error("Your property limit has been reached. Please upgrade to a PRO plan.", { id: toastId });
+        router.push("/subscription");
+      } else {
+        console.error("LISTING ERROR:", error);
+        toast.error(error.response?.data?.message || error.message || "Failed to list property.", { id: toastId });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -336,81 +307,59 @@ export default function Sell() {
 
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Street Address</label>
-                  <Input
-                    {...register("address", { required: "Address is required" })}
-                    className={inputStyle}
-                    placeholder="14, Sea View Road, Bandra West"
+                  <label className={labelStyle}>Search Location</label>
+                  <GeoapifyAutocomplete
+                    onSelect={(location) => {
+                      setValue("address", location.address);
+                      setValue("city", location.city);
+                      setValue("state", location.state);
+                      setLat(location.lat);
+                      setLng(location.lng);
+                      setSelectedState(location.state);
+                    }}
+                    onClear={() => {
+                      setValue("address", "");
+                      setValue("city", "");
+                      setValue("state", "");
+                      setLat(null);
+                      setLng(null);
+                      setSelectedState("");
+                    }}
                   />
-                  {errors.address && <p className="text-red-400 text-xs mt-1">{errors.address.message}</p>}
+                  <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5 mt-2">
+                    <span className="text-amber-500">📍</span>
+                    Your address will be geocoded automatically to enable location-based discovery.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                  {/* Country */}
-                  <div className="space-y-1">
-                    <label className={labelStyle}>Country</label>
-                    <select
-                      onChange={(e) => handleCountryChange(e.target.value)}
-                      className={`${inputStyle} w-full px-3`}
-                    >
-                      <option className="bg-[#0D2137]">Select Country</option>
-                      {countries.map((c) => (
-                      <option key={c.isoCode} value={c.isoCode} className="bg-[#0D2137]">
-                        {c.name}
-                      </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* State */}
-                  <div className="space-y-1">
-                    <label className={labelStyle}>State</label>
-                    <select
-                      onChange={(e) => handleStateChange(e.target.value)}
-                      className={`${inputStyle} w-full px-3`}
-                    >
-                      <option className="bg-[#0D2137]">Select State</option>
-                      {states.map((s) => (
-                        <option key={s.isoCode} value={s.isoCode} className="bg-[#0D2137]">
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* City */}
                   <div className="space-y-1">
                     <label className={labelStyle}>City</label>
-
-                    <select
-                      {...register("city")}
-                      disabled = {!selectedState}
-                      className={`${inputStyle} w-full px-3`}
-                    >
-                      <option value="" className="bg-[#0D2137]">Select City</option>
-                      {cities.map((c) => (
-                        <option key={c.name} value={c.name} className="bg-[#0D2137]">
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    {/* Manual fallback */}
-                    <input
-                      type="text"
-                      placeholder="Or enter manually"
-                      value={manualCity}
-                      onChange={(e) => setManualCity(e.target.value)}
-                      className="w-full mt-2 bg-white/5 border border-white/10 p-2 rounded-xl text-sm"
+                    <Input 
+                      {...register("city", { required: "City is required" })} 
+                      className={inputStyle} 
+                      placeholder="City" 
+                      readOnly 
                     />
                   </div>
-
+                  <div className="space-y-1">
+                    <label className={labelStyle}>State</label>
+                    <Input 
+                      {...register("state", { required: "State is required" })} 
+                      className={inputStyle} 
+                      placeholder="State" 
+                      readOnly 
+                    />
                   </div>
-                <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5">
-                  <span className="text-amber-500">📍</span>
-                  Your address will be geocoded automatically to enable location-based discovery.
-                </p>
+                  <div className="space-y-1">
+                    <label className={labelStyle}>Zip Code</label>
+                    <Input 
+                      {...register("zipCode", { required: "Zip Code is required" })} 
+                      className={inputStyle} 
+                      placeholder="400050" 
+                    />
+                  </div>
+                </div>
 
                 <div className="space-y-8">
                 <div className="space-y-1">
