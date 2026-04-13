@@ -160,7 +160,7 @@ export default function Sell() {
 
       const property = await propertyService.create(payload as any);
       
-      toast.success("Estate listed successfully!", { id: toastId });
+      toast.success("Property submitted for admin approval!", { id: toastId });
       
       // Update local store state to reflect the new property count
       if (user) {
@@ -171,7 +171,7 @@ export default function Sell() {
 
       reset();
       setFiles([]);
-      router.push(`/property/${property.property_id}`);
+      router.push("/");
 
     } catch (error: any) {
       if (error.response?.status === 409 || error.response?.data?.message === "LIMIT_REACHED" || error.message?.includes("LIMIT_REACHED")) {

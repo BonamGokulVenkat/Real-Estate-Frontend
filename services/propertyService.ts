@@ -1,7 +1,7 @@
 import { apiClient } from '../lib/apiClient';
 
 export type PropertyType = 'house' | 'apartment' | 'villa' | 'land' | 'commercial';
-export type PropertyStatus = 'available' | 'sold' | 'pending';
+export type PropertyStatus = 'pending' | 'available' | 'sold' | 'rejected';
 
 export interface PropertyMedia {
   media_id: string;
@@ -59,36 +59,60 @@ export interface CreatePropertyPayload {
 }
 
 export const propertyService = {
+
   getCities: async (): Promise<string[]> => {
-  const res = await apiClient.get<string[]>(`/properties/cities`);
-  return res.data;
-},
-  getStats: async (): Promise<{ totalProperties: number; totalBuilders: number; totalCities: number }> => {
-    const res = await apiClient.get<{ totalProperties: number; totalBuilders: number; totalCities: number }>('/properties/stats');
+    const res = await apiClient.get<string[]>(`/properties/cities`);
     return res.data;
   },
+
+  getStats: async (): Promise<{ totalProperties: number; totalBuilders: number; totalCities: number }> => {
+    const res = await apiClient.get('/properties/stats');
+    return res.data;
+  },
+
   getAll: async (): Promise<Property[]> => {
-    const response = await apiClient.get<Property[]>('/properties');
-    return response.data;
+    const res = await apiClient.get('/properties');
+    return res.data;
   },
+
   search: async (params: Record<string, any>): Promise<Property[]> => {
-    const response = await apiClient.get<Property[]>('/properties/search', { params });
-    return response.data;
+    const res = await apiClient.get('/properties/search', { params });
+    return res.data;
   },
+
   getById: async (id: string): Promise<Property> => {
-    const response = await apiClient.get<Property>(`/properties/${id}`);
-    return response.data;
+    const res = await apiClient.get(`/properties/${id}`);
+    return res.data;
   },
+
   create: async (data: CreatePropertyPayload): Promise<Property> => {
-    const response = await apiClient.post<Property>('/properties', data);
-    return response.data;
+    const res = await apiClient.post('/properties', data);
+    return res.data;
   },
+
   update: async (id: string, data: Partial<CreatePropertyPayload>): Promise<Property> => {
-    const response = await apiClient.patch<Property>(`/properties/${id}`, data);
-    return response.data;
+    const res = await apiClient.patch(`/properties/${id}`, data);
+    return res.data;
   },
+
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/properties/${id}`);
+  },
+
+  // ✅ NEW ADMIN APIs
+
+  getPending: async (): Promise<Property[]> => {
+    const res = await apiClient.get('/properties/admin/pending');
+    return res.data;
+  },
+
+  approve: async (id: string): Promise<Property> => {
+    const res = await apiClient.patch(`/properties/admin/approve/${id}`);
+    return res.data;
+  },
+
+  reject: async (id: string): Promise<Property> => {
+    const res = await apiClient.patch(`/properties/admin/reject/${id}`);
+    return res.data;
   }
 };
-
