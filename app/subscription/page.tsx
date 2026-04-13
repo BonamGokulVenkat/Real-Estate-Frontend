@@ -7,44 +7,39 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { subscriptionService } from "@/services/subscriptionService";
+import { apiClient } from "@/lib/apiClient";
 
 export default function Subscription() {
   const router = useRouter();
   const { user, setUser } = useAuthStore();
   const [loading, setLoading] = useState(false);
 
-  const plans = [
-    {
-      name: "FREE",
-      price: "0",
-      description: "For starters",
-      features: [
-        "Up to 3 Property Listings",
-        "Standard Visibility",
-        "Basic Analytics",
-        "Community Support",
-      ],
-      buttonText: "Current Plan",
-      highlight: false,
-    },
-    {
-      name: "PRO",
-      price: "299",
-      description: "For professionals",
-      features: [
-        "Up to 50 Property Listings",
-        "Priority Visibility",
-        "Advanced AI Insights",
-        "24/7 Dedicated Support",
-        "Featured Badge on Profile",
-      ],
-      buttonText: "Upgrade to PRO",
-      highlight: true,
-    }
-  ];
+  const [plans, setPlans] = useState<any[]>([]);
 
-  const handlePayment = async () => {
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const data = await subscriptionService.getActivePlans();
+        // Fallback to static if no plans in DB yet
+        if (data && data.length > 0) {
+          setPlans(data);
+        } else {
+            // Static fallback for initial setup
+            setPlans([
+                { id: 'free', name: "FREE", price: 0, propertyLimit: 3, description: "For starters", features: ["Up to 3 Property Listings", "Standard Visibility"] },
+                { id: 'pro', name: "PRO", price: 299, propertyLimit: 50, description: "For professionals", features: ["Up to 50 Property Listings", "Priority Visibility", "Advanced AI Insights"] }
+            ]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch plans", error);
+      }
+    }
+    fetchPlans();
+  }, []);
+
+  const handlePayment = async (plan: any) => {
     if (!user) {
       toast.error("Please log in first");
       return;
@@ -52,44 +47,30 @@ export default function Subscription() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/subscription/create-order`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // Assuming token is here
-        },
-        body: JSON.stringify({ amount: 299 }),
-      });
-
-      const order = await response.json();
+      const orderResponse = await apiClient.post('/subscription/create-order', { amount: plan.price });
+      const order = orderResponse.data;
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: "Luxora Real Estate",
-        description: "PRO Plan Subscription",
+        description: `${plan.name} Plan Subscription`,
         order_id: order.id,
         handler: async function (response: any) {
-          const verifyRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/subscription/verify`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
+          try {
+            const verifyRes = await apiClient.post('/subscription/verify', {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-            }),
-          });
+              planId: plan.id,
+            });
 
-          if (verifyRes.ok) {
-            const upgradedUser = await verifyRes.json();
+            const upgradedUser = verifyRes.data;
             setUser(upgradedUser); // Update local store
             toast.success("Welcome to the PRO family!");
             router.push("/sell");
-          } else {
+          } catch (error) {
             toast.error("Payment verification failed");
           }
         },
@@ -156,12 +137,12 @@ export default function Subscription() {
                 <p className="text-white/40 text-sm">{plan.description}</p>
                 <div className="mt-6 flex items-baseline gap-1">
                   <span className="text-4xl font-bold font-serif">₹{plan.price}</span>
-                  <span className="text-white/40">/month</span>
+                  <span className="text-white/40">/{plan.durationDays || 30} days</span>
                 </div>
               </div>
 
-              <div className="space-y-6 mb-12">
-                {plan.features.map((feature) => (
+              <div className="space-y-6 mb-12 min-h-[150px]">
+                {(plan.features || [`Up to ${plan.propertyLimit} Property Listings`, "Priority Visibility"]).map((feature: any) => (
                   <div key={feature} className="flex items-center gap-4">
                     <div className={`p-1 rounded-full ${plan.highlight ? "text-amber-500" : "text-white/20"}`}>
                       <Check className="w-4 h-4" />
@@ -172,15 +153,21 @@ export default function Subscription() {
               </div>
 
               <Button
-                onClick={() => plan.name === "PRO" && handlePayment()}
-                disabled={loading || (plan.name === "FREE" && user?.plan === "FREE") || (plan.name === "PRO" && user?.plan === "PRO")}
-                className={`w-full h-14 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all ${
-                  plan.highlight
-                    ? "bg-amber-500 hover:bg-amber-400 text-[#0A192F]"
-                    : "bg-white/5 hover:bg-white/10 text-white"
+                onClick={() => handlePayment(plan)}
+                disabled={loading || plan.price === 0 || user?.plan === plan.name}
+                className={`w-full h-14 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                  plan.price > 0
+                    ? "bg-amber-500 hover:bg-amber-400 text-[#0A192F] shadow-lg shadow-amber-500/20"
+                    : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
                 }`}
               >
-                {loading ? "Initializing..." : (user?.plan === plan.name ? "Current Plan" : plan.buttonText)}
+                {loading
+                  ? "Initializing..."
+                  : user?.plan === plan.name
+                  ? "✓ Current Plan"
+                  : plan.price === 0
+                  ? "Free Plan"
+                  : "Upgrade Now →"}
               </Button>
             </motion.div>
           ))}

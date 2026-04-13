@@ -6,7 +6,7 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "@/components/QueryProvider";
-import LayoutContent from "@/components/common/LayoutContent"; // We'll move the logic here
+import LayoutContent from "@/components/common/LayoutContent";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,8 +19,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My App",
-  description: "Created with Next.js",
+  title: {
+    default: "Luxora Estates — Premium Real Estate",
+    template: "%s | Luxora Estates",
+  },
+  description:
+    "Discover premium luxury properties across India. Luxora Estates connects elite buyers, sellers, and builders on one exclusive platform.",
+  keywords: ["luxury real estate", "premium properties", "India estates", "buy property", "sell property"],
+  openGraph: {
+    title: "Luxora Estates — Premium Real Estate",
+    description: "Discover premium luxury properties across India.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -29,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -38,7 +48,7 @@ export default function RootLayout({
             <LayoutContent>
               {children}
             </LayoutContent>
-            <Toaster />
+            <Toaster richColors position="top-right" />
           </TooltipProvider>
         </QueryProvider>
       </body>

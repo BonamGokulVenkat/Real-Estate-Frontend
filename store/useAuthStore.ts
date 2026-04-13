@@ -29,6 +29,8 @@ interface AuthState {
   logout: () => void;
 }
 
+const STORAGE_KEY = 'auth-storage';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -39,10 +41,21 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           user: state.user ? { ...state.user, ...partial } : state.user,
         })),
-      logout: () => set({ user: null, isAuthenticated: false }),
+      logout: () => {
+        // Clear in-memory state immediately
+        set({ user: null, isAuthenticated: false });
+        // Also wipe the persisted localStorage entry so no stale
+        // data can be re-hydrated on next render / page navigation
+        try {
+          localStorage.removeItem(STORAGE_KEY);
+        } catch {
+          // localStorage may not be available in SSR context — safe to ignore
+        }
+      },
     }),
     {
-      name: 'auth-storage',
+      name: STORAGE_KEY,
     }
   )
 );
+

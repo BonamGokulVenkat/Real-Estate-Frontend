@@ -37,23 +37,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
-    } else if (user && user.role === "admin") {
-      router.push("/admin");
-    } else {
+    } else if (user && user.role !== "admin") {
       router.push("/");
     }
+    // If authenticated admin, stay — no redirect needed
   }, [isAuthenticated, user, router]);
 
   if (!isAuthenticated || !user || user.role !== "admin") {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#0A192F]">
-        <motion.div 
-          animate={{ opacity: [0.5, 1, 0.5] }} 
+      <div className="flex flex-col items-center justify-center h-screen bg-[#0A192F] gap-4">
+        <motion.div
+          className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center"
+          animate={{ scale: [1, 1.1, 1], opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="text-amber-500 font-serif italic text-xl tracking-widest underline decoration-amber-500/30 underline-offset-8"
         >
-          Authenticating Admin...
+          <ShieldCheck className="w-6 h-6 text-amber-500" />
         </motion.div>
+        <p className="text-white/40 text-sm font-light tracking-widest">Verifying credentials…</p>
       </div>
     );
   }
@@ -67,22 +67,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const SidebarContent = () => (
     <>
-    
       <Link href="/" className="block">
-        <div className="p-8 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent hover:bg-white/[0.04] transition-colors cursor-pointer">
+        <div className="p-8 border-b border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent hover:bg-white/[0.04] transition-colors">
           <div className="flex items-center gap-4 group">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.2)]">
+            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.25)] group-hover:shadow-[0_0_30px_rgba(245,158,11,0.4)] transition-shadow">
               <ShieldCheck className="text-[#0A192F] w-6 h-6" />
             </div>
             <div className="flex flex-col">
-              <span className="font-serif text-xl font-bold tracking-tight">Luxora</span>
+              <span className="font-serif text-xl font-bold tracking-tight text-white">Luxora</span>
               <span className="text-[9px] uppercase tracking-[0.4em] text-amber-500 font-bold leading-none mt-1">Admin Portal</span>
             </div>
           </div>
         </div>
       </Link>
 
-      <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto">
+      {/* Admin user badge */}
+      <div className="mx-4 mt-4 mb-2 px-4 py-3 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-[#0A192F] font-bold text-xs shrink-0">
+          {user.name?.[0]?.toUpperCase() || "A"}
+        </div>
+        <div className="min-w-0">
+          <div className="text-white text-xs font-semibold truncate">{user.name}</div>
+          <div className="text-white/30 text-[10px] truncate">{user.email}</div>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {ADMIN_LINKS.map((link) => {
           const isActive = pathname === link.path;
           return (
@@ -91,13 +101,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 whileHover={{ x: 4 }}
                 className={cn(
                   "flex items-center justify-between px-5 py-4 rounded-2xl transition-all duration-300 group",
-                  isActive 
-                    ? "bg-amber-500 text-[#0A192F] font-bold shadow-lg" 
-                    : "text-white/40 hover:text-white hover:bg-white/5"
+                  isActive
+                    ? "bg-amber-500 text-[#0A192F] font-bold shadow-lg shadow-amber-500/20"
+                    : "text-white/40 hover:text-white hover:bg-white/[0.05]"
                 )}
               >
                 <div className="flex items-center gap-4">
-                  <link.icon className={cn("w-5 h-5", isActive ? "text-[#0A192F]" : "group-hover:text-amber-500")} />
+                  <link.icon className={cn("w-5 h-5", isActive ? "text-[#0A192F]" : "group-hover:text-amber-500 transition-colors")} />
                   <span className="text-sm tracking-wide">{link.label}</span>
                 </div>
                 {isActive && <ChevronRight className="w-4 h-4" />}
@@ -107,13 +117,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })}
       </nav>
 
-      <div className="p-6 border-t border-white/5 bg-[#061020]/50">
+      <div className="p-6 border-t border-white/5">
         <Button
           variant="ghost"
           onClick={handleLogout}
-          className="w-full justify-start text-white/40 hover:text-red-400 hover:bg-red-500/10 rounded-xl px-4 py-6"
+          className="w-full justify-start text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-xl px-4 py-6 transition-all group"
         >
-          <LogOut className="w-5 h-5 mr-3" />
+          <LogOut className="w-5 h-5 mr-3 group-hover:translate-x-0.5 transition-transform" />
           <span className="font-bold text-[10px] uppercase tracking-widest">Terminate Session</span>
         </Button>
       </div>
@@ -121,18 +131,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   );
 
   return (
-  <div className="flex h-screen overflow-hidden bg-[#0A192F] text-white selection:bg-amber-500/30">
-    
-    {/* ── Mobile Top Bar (Remains sticky at top) ── */}
-    <header className="lg:hidden fixed top-0 left-0 right-0 h-20 bg-[#081426]/80 border-b border-white/5 flex items-center justify-between px-6 z-[60] backdrop-blur-md">
-       <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+    <div className="flex h-screen overflow-hidden bg-[#0A192F] text-white">
+
+      {/* ── Mobile Top Bar ── */}
+      <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#081426]/90 border-b border-white/5 flex items-center justify-between px-4 z-[60] backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="text-white hover:bg-white/5 -ml-2"
+            className="text-white hover:bg-white/5 rounded-xl"
           >
-            {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
           <div className="flex items-center gap-2">
             <ShieldCheck className="text-amber-500 w-5 h-5" />
@@ -140,59 +150,59 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
         <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-[#0A192F] font-bold text-xs">
-          {user.name?.[0].toUpperCase()}
+          {user.name?.[0]?.toUpperCase() || "A"}
         </div>
-    </header>
+      </header>
 
-    {/* ── Mobile Sidebar Drawer ── */}
-    <AnimatePresence>
-      {isMobileMenuOpen && (
-        <>
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[65] lg:hidden"
-          />
-          <motion.aside 
-            initial={{ x: "-100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 left-0 w-[280px] bg-[#081426] z-[70] flex flex-col border-r border-white/10 lg:hidden shadow-2xl"
-          >
-            <SidebarContent />
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+      {/* ── Mobile Sidebar Drawer ── */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[65] lg:hidden"
+            />
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-[#081426] z-[70] flex flex-col border-r border-white/10 lg:hidden shadow-2xl"
+            >
+              <SidebarContent />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
-    {/* ── Desktop Sidebar (FIXED) ── */}
-    <aside className="hidden lg:flex flex-col w-80 bg-[#081426] border-r border-white/5 h-screen sticky top-0 flex-shrink-0 overflow-hidden">
-      <SidebarContent />
-    </aside>
+      {/* ── Desktop Sidebar (FIXED) ── */}
+      <aside className="hidden lg:flex flex-col w-72 bg-[#081426] border-r border-white/5 h-screen sticky top-0 flex-shrink-0">
+        <SidebarContent />
+      </aside>
 
-    {/* ── Main Dashboard Content (SCROLLABLE) ── */}
-    <main className="flex-1 h-screen overflow-y-auto relative pt-20 lg:pt-0 custom-scrollbar">
-      {/* Ambient background glows */}
-      <div className="absolute top-0 right-0 w-[300px] md:w-[800px] h-[300px] md:h-[800px] bg-amber-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-[600px] h-[600px] bg-blue-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
-      
-      <div className="p-6 md:p-12 lg:p-16 max-w-7xl mx-auto relative z-10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    </main>
-  </div>
-);
+      {/* ── Main Dashboard Content (SCROLLABLE) ── */}
+      <main className="flex-1 h-screen overflow-y-auto relative pt-16 lg:pt-0">
+        {/* Ambient background glows */}
+        <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-amber-500/[0.025] rounded-full blur-[160px] pointer-events-none" />
+        <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/[0.025] rounded-full blur-[160px] pointer-events-none" />
+
+        <div className="relative z-10 p-6 md:p-10 lg:p-14 max-w-7xl mx-auto">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
+  );
 }
