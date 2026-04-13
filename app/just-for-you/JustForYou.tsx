@@ -276,33 +276,6 @@ export default function JustForYou() {
                     onValueChange={setMaxPrice}
                     className="relative flex items-center select-none touch-none w-full"
                   />
-
-                  <style jsx global>{`
-                    .relative.flex.items-center.w-full > span:first-child {
-                      height: 2px !important;
-                      background-color: rgba(255, 255, 255, 0.05) !important;
-                    }
-                    .relative.flex.items-center.w-full span > span {
-                      background-color: #f59e0b !important;
-                    }
-                    .relative.flex.items-center.w-full [role="slider"] {
-                      height: 14px !important;
-                      width: 14px !important;
-                      border: 2px solid #f59e0b !important;
-                      background-color: #0a192f !important;
-                      box-shadow: 0 0 10px rgba(245, 158, 11, 0.3) !important;
-                      cursor: grab !important;
-                      transition: transform 0.2s ease,
-                        box-shadow 0.2s ease !important;
-                    }
-                    .relative.flex.items-center.w-full [role="slider"]:active {
-                      cursor: grabbing !important;
-                    }
-                    .relative.flex.items-center.w-full [role="slider"]:hover {
-                      transform: scale(1.2) !important;
-                      box-shadow: 0 0 20px rgba(245, 158, 11, 0.5) !important;
-                    }
-                  `}</style>
                 </div>
 
                 <div className="flex justify-between text-[8px] font-bold uppercase tracking-[0.2em] text-white/10">
@@ -324,7 +297,7 @@ export default function JustForYou() {
                       onClick={() => setMinBeds(n)}
                       className={`h-9 rounded-lg text-[10px] font-bold transition-all border-white/5 ${
                         minBeds === n
-                          ? "bg-amber-500 text-slate-950 border-amber-500"
+                          ? "bg-amber-500 text-white/40 border-amber-500"
                           : "bg-white/5 hover:bg-white/10 text-white/40"
                       }`}
                     >

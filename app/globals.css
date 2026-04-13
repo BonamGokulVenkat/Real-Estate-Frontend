@@ -122,5 +122,66 @@
   }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: rgba(245, 158, 11, 0.25);
+    color: #fff;
+  }
+}
+
+/* ── Premium Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 100px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.35);
+}
+
+/* ── Slider Custom Styles ── */
+[role="slider"] {
+  height: 14px !important;
+  width: 14px !important;
+  border: 2px solid #f59e0b !important;
+  background-color: #0a192f !important;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.3) !important;
+  cursor: grab !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+[role="slider"]:hover {
+  transform: scale(1.2) !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.5) !important;
+}
+[role="slider"]:active {
+  cursor: grabbing !important;
+}
+
+/* ── Focus Ring Cleanup ── */
+*:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.5);
+  outline-offset: 2px;
+}
+
+/* ── Smooth page transitions ── */
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-fade-in 0.4s ease forwards;
 }

@@ -230,12 +230,14 @@ export default function Sell() {
             <div className="space-y-8">
               <div className="space-y-1">
                 <label className={labelStyle}>Listing Title</label>
-                <Input {...register("title", { required: "Title is required" })} className={inputStyle} placeholder="The Glass Pavilion, Worli" />
+                <Input {...register("title", { required: "Title is required" })} className={`${inputStyle} ${errors.title ? "border-red-500/50" : ""}`} placeholder="The Glass Pavilion, Worli" />
+                {errors.title && <p className="text-red-400 text-[10px] mt-1">{errors.title.message}</p>}
               </div>
 
               <div className="space-y-1">
                 <label className={labelStyle}>Description</label>
-                <textarea {...register("description", { required: "Description is required" })} className={`${inputStyle} w-full p-4 min-h-[120px] resize-y`} placeholder="Describe the details of your property..." />
+                <textarea {...register("description", { required: "Description is required" })} className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${errors.description ? "border-red-500/50" : ""}`} placeholder="Describe the details of your property..." />
+                {errors.description && <p className="text-red-400 text-[10px] mt-1">{errors.description.message}</p>}
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -361,23 +363,21 @@ export default function Sell() {
                   </div>
                 </div>
 
-                <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Features</label>
+                  <label className={labelStyle}>Features & Amenities</label>
+                  <p className="text-white/20 text-[10px] mb-3">Add amenities and features (press Enter to add)</p>
                   <Controller
-                      name="features"
-                      control={control}
-                      defaultValue={[]}
-                      render={({ field }) => (
-                        <TagInput
-                          value={field.value || []}
-                          onChange={field.onChange}
-                        />
-                      )}
-                    />
-                  {errors.features && <p className="text-red-400 text-xs mt-1">{errors.features.message}</p>}
-                </div>
-
+                    name="features"
+                    control={control}
+                    defaultValue={[]}
+                    render={({ field }) => (
+                      <TagInput
+                        value={field.value || []}
+                        onChange={field.onChange}
+                      />
+                    )}
+                  />
+                  {errors.features && <p className="text-red-400 text-[10px] mt-1">{errors.features.message}</p>}
                 </div>
                 
               </div>

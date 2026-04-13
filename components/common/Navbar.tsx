@@ -13,13 +13,13 @@ import { useAuthStore } from "@/store/useAuthStore";
 import Cookies from "js-cookie";
 
 import { Button } from "@/components/ui/button";
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetTitle, 
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
   SheetTrigger,
   SheetClose,
-  SheetDescription 
+  SheetDescription
 } from "@/components/ui/sheet";
 
 const NAV_LINKS = [
@@ -55,9 +55,18 @@ export default function Navbar() {
 
   useEffect(() => {
     setMounted(true);
+
+    // If Zustand's persisted state says "authenticated" but the actual
+    // auth cookie no longer exists (e.g. expired, other-tab logout, manual clear)
+    // → clear the stale store so the navbar shows Sign In / Sign Up correctly.
+    if (isAuthenticated && !Cookies.get("access_token")) {
+      logout();
+    }
+
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLogout = () => {
@@ -77,7 +86,9 @@ export default function Navbar() {
     return true;
   });
 
-  const isLoggedIn = mounted && isAuthenticated && !!user;
+  // Show authenticated UI only when: fully mounted on client, store says authenticated,
+  // user object exists, AND the cookie is still present (guards against stale localStorage)
+  const isLoggedIn = mounted && isAuthenticated && !!user && !!Cookies.get("access_token");
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -95,12 +106,12 @@ export default function Navbar() {
   return (
     <nav className={cn(
       "fixed top-0 left-0 right-0 z-[100] transition-all duration-500 flex items-center",
-      scrolled 
-        ? "bg-[#0A192F]/90 backdrop-blur-xl border-b border-white/5 h-20 shadow-2xl" 
+      scrolled
+        ? "bg-[#0A192F]/90 backdrop-blur-xl border-b border-white/5 h-20 shadow-2xl"
         : "bg-transparent h-24"
     )}>
       <div className="container mx-auto px-4 lg:px-8 flex items-center justify-between">
-        
+
         {/* ── Mobile Side Toggle ── */}
         <div className="lg:hidden flex items-center">
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -109,9 +120,9 @@ export default function Navbar() {
                 <Menu className="w-6 h-6" />
               </Button>
             </SheetTrigger>
-            
-            <SheetContent 
-              side="left" 
+
+            <SheetContent
+              side="left"
               className="bg-[#0A192F] border-r border-white/10 text-white w-[300px] p-0 flex flex-col z-[110] [&>button]:hidden"
             >
               <VisuallyHidden.Root>
@@ -140,8 +151,8 @@ export default function Navbar() {
                         href={link.path}
                         className={cn(
                           "flex items-center gap-4 px-4 py-4 rounded-xl transition-all",
-                          isActive 
-                            ? "bg-amber-500 text-[#0A192F] font-bold" 
+                          isActive
+                            ? "bg-amber-500 text-[#0A192F] font-bold"
                             : "text-white/60 hover:text-white hover:bg-white/5"
                         )}
                       >
@@ -172,7 +183,7 @@ export default function Navbar() {
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button 
+                      <Button
                         onClick={handleLogout}
                         className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold rounded-xl h-12"
                       >
@@ -201,8 +212,8 @@ export default function Navbar() {
                 <div className="flex items-center justify-between mt-6 px-2">
                   <div className="flex items-center gap-2">
                     <span className="text-white/40 text-xs uppercase font-bold tracking-widest">Currency</span>
-                    <select 
-                      value={currency} 
+                    <select
+                      value={currency}
                       onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
                       className="bg-transparent text-amber-500 font-bold text-sm outline-none cursor-pointer appearance-none ml-2"
                     >
@@ -218,8 +229,8 @@ export default function Navbar() {
         </div>
 
         {/* ── Logo ── */}
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           className={cn(
             "flex items-center gap-2 group shrink-0 transition-opacity duration-300",
             isOpen ? "opacity-0" : "opacity-100"
@@ -267,7 +278,7 @@ export default function Navbar() {
 
         {/* ── Right Actions (Desktop) ── */}
         <div className="hidden lg:flex items-center gap-6 relative">
-          
+
           {/* Currency Dropdown */}
           <div className="relative group cursor-pointer flex items-center gap-1.5 text-white/60 hover:text-amber-500 font-medium text-sm transition-colors">
             <span>{currency}</span>
