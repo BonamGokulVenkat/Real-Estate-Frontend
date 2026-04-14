@@ -34,16 +34,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // ✅ FIXED LOGIC HERE
   useEffect(() => {
-    if (!isAuthenticated) {
+    const token = Cookies.get("access_token");
+
+    // ❌ No token → not logged in
+    if (!token) {
       router.push("/login");
-    } else if (user && user.role !== "admin") {
+      return;
+    }
+
+    // ⏳ Token exists but Zustand not ready → wait
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
+    // ❌ Not admin
+    if (user.role !== "admin") {
       router.push("/");
     }
-    // If authenticated admin, stay — no redirect needed
+
   }, [isAuthenticated, user, router]);
 
-  if (!isAuthenticated || !user || user.role !== "admin") {
+  // ✅ Prevent wrong blocking
+  const token = Cookies.get("access_token");
+
+  if (!token || !isAuthenticated || !user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-[#0A192F] gap-4">
         <motion.div
@@ -53,7 +69,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <ShieldCheck className="w-6 h-6 text-amber-500" />
         </motion.div>
-        <p className="text-white/40 text-sm font-light tracking-widest">Verifying credentials…</p>
+        <p className="text-white/40 text-sm font-light tracking-widest">
+          Verifying credentials…
+        </p>
       </div>
     );
   }
@@ -75,7 +93,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div className="flex flex-col">
               <span className="font-serif text-xl font-bold tracking-tight text-white">Luxora</span>
-              <span className="text-[9px] uppercase tracking-[0.4em] text-amber-500 font-bold leading-none mt-1">Admin Portal</span>
+              <span className="text-[9px] uppercase tracking-[0.4em] text-amber-500 font-bold leading-none mt-1">
+                Admin Portal
+              </span>
             </div>
           </div>
         </div>
@@ -107,7 +127,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}
               >
                 <div className="flex items-center gap-4">
-                  <link.icon className={cn("w-5 h-5", isActive ? "text-[#0A192F]" : "group-hover:text-amber-500 transition-colors")} />
+                  <link.icon
+                    className={cn(
+                      "w-5 h-5",
+                      isActive ? "text-[#0A192F]" : "group-hover:text-amber-500 transition-colors"
+                    )}
+                  />
                   <span className="text-sm tracking-wide">{link.label}</span>
                 </div>
                 {isActive && <ChevronRight className="w-4 h-4" />}
@@ -124,7 +149,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           className="w-full justify-start text-white/30 hover:text-red-400 hover:bg-red-500/10 rounded-xl px-4 py-6 transition-all group"
         >
           <LogOut className="w-5 h-5 mr-3 group-hover:translate-x-0.5 transition-transform" />
-          <span className="font-bold text-[10px] uppercase tracking-widest">Terminate Session</span>
+          <span className="font-bold text-[10px] uppercase tracking-widest">
+            Terminate Session
+          </span>
         </Button>
       </div>
     </>
@@ -132,8 +159,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0A192F] text-white">
-
-      {/* ── Mobile Top Bar ── */}
+      {/* Mobile Top Bar */}
       <header className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#081426]/90 border-b border-white/5 flex items-center justify-between px-4 z-[60] backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <Button
@@ -154,7 +180,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
 
-      {/* ── Mobile Sidebar Drawer ── */}
+      {/* Mobile Sidebar */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <>
@@ -178,29 +204,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         )}
       </AnimatePresence>
 
-      {/* ── Desktop Sidebar (FIXED) ── */}
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 bg-[#081426] border-r border-white/5 h-screen sticky top-0 flex-shrink-0">
         <SidebarContent />
       </aside>
 
-      {/* ── Main Dashboard Content (SCROLLABLE) ── */}
+      {/* Main Content */}
       <main className="flex-1 h-screen overflow-y-auto relative pt-16 lg:pt-0">
-        {/* Ambient background glows */}
-        <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-amber-500/[0.025] rounded-full blur-[160px] pointer-events-none" />
-        <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/[0.025] rounded-full blur-[160px] pointer-events-none" />
-
         <div className="relative z-10 p-6 md:p-10 lg:p-14 max-w-7xl mx-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          {children}
         </div>
       </main>
     </div>

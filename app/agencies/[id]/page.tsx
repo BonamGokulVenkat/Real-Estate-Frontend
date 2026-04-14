@@ -19,8 +19,6 @@ import {
   AlertCircle,
   PackageOpen,
   Star,
-  TrendingUp,
-  Home,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
 
@@ -64,6 +62,7 @@ export default function AgencyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { formatPrice } = useCurrency();
+
   const [builder, setBuilder] = useState<Builder | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,22 +109,26 @@ export default function AgencyDetailPage() {
     );
   }
 
+  // ✅ LOGIC FIX: Filter only available properties
+  const approvedProperties = builder.properties.filter(
+    (p) => p.status === "available"
+  );
+
   const joined = new Date(builder.date_joined).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
   });
 
-  const propertyTypes = [...new Set(builder.properties.map((p) => p.property_type))];
+  const propertyTypes = [...new Set(approvedProperties.map((p) => p.property_type))];
+  
   const avgPrice =
-  builder.properties.length > 0
-    ? builder.properties.reduce((sum, p) => {
-        const price = Number(p.price);
-
-        if (!price || isNaN(price) || !isFinite(price)) return sum;
-
-        return sum + price;
-      }, 0) / builder.properties.length
-    : 0;
+    approvedProperties.length > 0
+      ? approvedProperties.reduce((sum, p) => {
+          const price = Number(p.price);
+          if (!price || isNaN(price) || !isFinite(price)) return sum;
+          return sum + price;
+        }, 0) / approvedProperties.length
+      : 0;
 
   const initials = builder.name
     .split(" ")
@@ -141,7 +144,6 @@ export default function AgencyDetailPage() {
       <div className="absolute top-1/3 right-0 w-[400px] h-[400px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-8 pt-32 pb-24 relative z-10">
-
         {/* Back */}
         <motion.button
           initial={{ opacity: 0, x: -20 }}
@@ -179,7 +181,6 @@ export default function AgencyDetailPage() {
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              {/* Name + badges */}
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 <h1 className="font-serif text-4xl md:text-5xl font-bold">{builder.name}</h1>
                 <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-[0.3em] rounded-full flex items-center gap-1">
@@ -188,7 +189,6 @@ export default function AgencyDetailPage() {
                 </span>
               </div>
 
-              {/* Company name */}
               {builder.company_name && (
                 <p className="text-amber-500/80 font-semibold text-lg mb-3 flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
@@ -196,7 +196,6 @@ export default function AgencyDetailPage() {
                 </p>
               )}
 
-              {/* Contact row */}
               <div className="flex flex-wrap items-center gap-4 mb-4">
                 {builder.email && (
                   <span className="flex items-center gap-2 text-white/40 text-sm">
@@ -248,7 +247,7 @@ export default function AgencyDetailPage() {
             {/* Stats panel */}
             <div className="shrink-0 grid grid-cols-2 gap-4 md:grid-cols-1 w-full md:w-auto">
               <div className="bg-white/[0.04] border border-white/10 rounded-2xl px-7 py-5 text-center">
-                <p className="text-3xl font-serif font-bold text-amber-500 tabular-nums">{builder.properties.length}</p>
+                <p className="text-3xl font-serif font-bold text-amber-500 tabular-nums">{approvedProperties.length}</p>
                 <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold mt-1">Listings</p>
               </div>
               {avgPrice > 0 && (
@@ -286,19 +285,19 @@ export default function AgencyDetailPage() {
         </div>
         <h2 className="font-serif text-3xl md:text-4xl font-bold mb-12">Properties Listed</h2>
 
-        {builder.properties.length === 0 ? (
+        {approvedProperties.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center justify-center py-28 gap-6 bg-white/[0.02] border border-white/5 rounded-[40px]"
           >
             <PackageOpen className="w-16 h-16 text-white/10" />
-            <p className="text-white/30 text-xl font-serif font-light">No listings yet!</p>
+            <p className="text-white/30 text-xl font-serif font-light">No approved listings yet!</p>
             <p className="text-white/20 text-sm">Check back soon for upcoming properties by this builder.</p>
           </motion.div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {builder.properties.map((property, index) => {
+            {approvedProperties.map((property, index) => {
               const thumbnail = property.media?.find((m) => m.media_type === "image")?.url;
               const location = property.location
                 ? `${property.location.city}, ${property.location.state}`
@@ -313,7 +312,6 @@ export default function AgencyDetailPage() {
                 >
                   <Link href={`/property/${property.property_id}`} className="group block">
                     <div className="relative bg-white/[0.04] border border-white/10 rounded-[28px] overflow-hidden hover:border-amber-500/30 hover:shadow-xl hover:shadow-amber-500/5 transition-all duration-500">
-
                       {/* Thumbnail */}
                       <div className="relative h-52 bg-white/5 overflow-hidden">
                         {thumbnail ? (
@@ -327,17 +325,9 @@ export default function AgencyDetailPage() {
                             <Building2 className="w-12 h-12 text-white/10" />
                           </div>
                         )}
-                        {/* Status badge */}
-                        <div className={`absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                          property.status === "available"
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/20"
-                            : property.status === "sold"
-                            ? "bg-red-500/20 text-red-400 border border-red-500/20"
-                            : "bg-amber-500/20 text-amber-400 border border-amber-500/20"
-                        }`}>
+                        <div className="absolute top-4 left-4 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-emerald-500/20 text-emerald-400 border border-emerald-500/20">
                           {property.status}
                         </div>
-                        {/* Price */}
                         <div className="absolute bottom-4 right-4 bg-[#0A192F]/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-amber-400 font-bold text-sm border border-white/5">
                           {formatPrice(property.price)}
                         </div>
