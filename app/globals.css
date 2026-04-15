@@ -125,10 +125,13 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    width: 100vw;
   }
 
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   ::selection {
