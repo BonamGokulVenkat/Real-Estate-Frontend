@@ -31,7 +31,10 @@ export default function Login() {
       toast.success("Logged in successfully!");
 
       // Store tokens
-      Cookies.set("access_token", data.access_token);
+      Cookies.set("access_token", data.access_token,{
+        secure: true,
+        sameSite: "None",
+      });
       if (data.refresh_token) {
         Cookies.set("refresh_token", data.refresh_token);
       }
@@ -42,11 +45,11 @@ export default function Login() {
 
       // Redirect
       if (profile.role === "admin") {
-        router.push("/admin");
+        window.location.href = "/admin";
       } else if (profile.role === "builder") {
-        router.push("/sell");
+        window.location.href = "/sell";
       } else {
-        router.push("/");
+        window.location.href = "/";
       }
 
     } catch (error: any) {
