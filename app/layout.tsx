@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import FloatingChatButton from "@/components/common/FloatingChatIcon";
+import LayoutChatIconWrapper from "@/components/common/LayoutChatIconWrapper";
 import "./globals.css";
 
 // Providers & Components
@@ -54,6 +56,7 @@ export default function RootLayout({
           <TooltipProvider>
             <LayoutContent>
               {children}
+              <LayoutChatIconWrapper/>
             </LayoutContent>
             <Toaster richColors position="top-right" />
           </TooltipProvider>
