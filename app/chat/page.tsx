@@ -1139,10 +1139,12 @@ export default function PropertyChatWidget() {
           aria-label="Chat messages"
         >
           {messages.map((msg) =>
-            msg.role === "user"
-              ? <BubbleUser key={msg.id} msg={msg} />
-              : <BubbleAI   key={msg.id} msg={msg} />
-          )}
+              msg.role === "user"
+                ? <BubbleUser key={msg.id} msg={msg} />
+                : (msg.streaming && !msg.content && !msg.properties?.length)
+                  ? null
+                  : <BubbleAI key={msg.id} msg={msg} />
+            )}
           {isThinking && <TypingIndicator />}
           <div ref={bottomRef} />
         </div>
