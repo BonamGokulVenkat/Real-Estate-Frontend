@@ -70,6 +70,15 @@ export default function Sell() {
  
 
   const currentPrice = watch("price");
+  
+  const normalizeFile = (file: File): File => {
+  if (file.name.toLowerCase().endsWith('.jfif')) {
+    return new File([file], file.name.replace(/\.jfif$/i, '.jpg'), {
+      type: 'image/jpeg',
+    });
+  }
+  return file;
+};
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -87,6 +96,9 @@ export default function Sell() {
   };
 
   const onSubmit = async (data: SellForm) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log("SESSION AT UPLOAD:", session);
+    console.log("USER ID:", user?.user_id);
     if (!user) {
       toast.error("You must be logged in to create a listing.");
       return;
@@ -102,31 +114,37 @@ export default function Sell() {
     try {
       const uploadedMedia = [];
 
-      for (const [index, file] of files.entries()) {
-        const fileExt = file.name.split('.').pop();
+      // Replace the entire supabase.storage.upload block with this:
+      for (const [index, rawFile] of files.entries()) {
+        const file = normalizeFile(rawFile); // your .jfif normalizer
+        const fileExt = file.name.split(".").pop();
         const fileName = `${uuidv4()}.${fileExt}`;
-        const filePath = `${user.user_id || crypto.randomUUID()}/${fileName}`;
+        const filePath = `${user.user_id}/${fileName}`;
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from('properties')
-          .upload(filePath, file);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("filePath", filePath);
 
-        if (uploadError) {
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const { error } = await res.json();
+          throw new Error(`Failed to upload ${file.name}: ${error}`);
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('properties')
-          .getPublicUrl(filePath);
+        const { publicUrl } = await res.json();
 
         uploadedMedia.push({
-          media_type: file.type.startsWith('video/') ? 'video' : 'image',
-          room_type: 'other',
+          media_type: file.type.startsWith("video/") ? "video" : "image",
+          room_type: "other",
           url: publicUrl,
           thumbnail_url: publicUrl,
           display_order: index,
         });
-      }
+    }
 
       if (lat === null || lng === null) {
         toast.error("Please select a valid location from suggestions", { id: toastId });
