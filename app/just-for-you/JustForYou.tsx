@@ -76,6 +76,7 @@ export default function JustForYou() {
       if (cityFilter !== "all") params.city = cityFilter;
       if (maxPrice[0] < 100000000) params.max_price = maxPrice[0];
       if (minBeds > 0) params.bedrooms = minBeds;
+      console.log("SEARCH PARAMS:", params);
 
       const data = await propertyService.search(params);
 
