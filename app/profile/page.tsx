@@ -47,11 +47,14 @@ export default function Profile() {
       </div>
     );
   }
-
+  const getNumericPrice = (price: string) => {
+    const num = Number(price);
+    return isNaN(num) ? Number.MAX_SAFE_INTEGER : num;
+  }
   const saved = favorites?.map((f) => f.property) || [];
   const listed = myProperties || [];
   const totalValue = listed.reduce(
-    (sum, p) => sum + getConvertedPrice(p.price),
+    (sum, p) => sum + getConvertedPrice(getNumericPrice(p.price)),
     0
   );
   const experienceYears = new Date().getFullYear() - new Date(user.date_joined ?? new Date()).getFullYear();
