@@ -23,7 +23,7 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   size_sqft: number;
-  price: number;
+  price: string;
   location: {
     address: string;
     city: string;
@@ -45,7 +45,7 @@ export interface CreatePropertyPayload {
   bedrooms: number;
   bathrooms: number;
   size_sqft: number;
-  price: number;
+  price: string;
   location: {
     address: string;
     city: string;

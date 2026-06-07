@@ -24,8 +24,8 @@ interface SellForm {
   type: string;
   bedrooms: number;
   bathrooms: number;
-  size: number;
-  price: number;
+  size?: number;
+  price: string;
   address: string;
   city: string;
   state: string;
@@ -70,7 +70,21 @@ export default function Sell() {
  
 
   const currentPrice = watch("price");
-  
+  const numericPrice = Number(currentPrice);
+const isNumericPrice =
+  currentPrice?.trim() !== "" &&
+  !isNaN(numericPrice) &&
+  isFinite(numericPrice) &&
+  numericPrice > 0;
+    const displayPrice = (price: string) => {
+    const num = Number(price);
+
+    if (!isNaN(num) && isFinite(num)) {
+      return formatPrice(num);
+    }
+
+    return price;
+  };
   const normalizeFile = (file: File): File => {
   if (file.name.toLowerCase().endsWith('.jfif')) {
     return new File([file], file.name.replace(/\.jfif$/i, '.jpg'), {
@@ -160,8 +174,8 @@ export default function Sell() {
         property_type: data.type.toLowerCase() as PropertyType,
         bedrooms: Number(data.bedrooms),
         bathrooms: Number(data.bathrooms),
-        size_sqft: Number(data.size),
-        price: Number(data.price),
+        size_sqft: data.size ? Number(data.size) : null,
+        price: data.price,
         location: {
           address: data.address,
           city: data.city,
@@ -286,14 +300,14 @@ export default function Sell() {
                     </select>
                     </div>
                     <div className="space-y-1 w-58">
-                      <Input {...register("price", { required: "Price is required" })} type="number" className={`${inputStyle} pl-12`} placeholder="120000000" />
+                      <Input {...register("price", { required: "Price is required" })} type="text" className={`${inputStyle} pl-12`} placeholder="120000000 or Price on Request" />
                     </div>
                   </div>
-                  {currentPrice > 0 && (
+                  {isNumericPrice && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      {currentPrice > 0 && (
+                      {isNumericPrice && (
                         <span className="text-amber-500 text-xs mt-2">
-                          Estimated: {formatPrice(currentPrice)} 
+                          Estimated: {formatPrice(numericPrice)}
                         </span>
                       )}
                     </p>
@@ -320,7 +334,7 @@ export default function Sell() {
                   <label className={labelStyle}>Sqft</label>
                   <div className="relative">
                     <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input {...register("size", { required: "Required" })} type="number" className={`${inputStyle} pl-12`} placeholder="6500" />
+                    <Input {...register("size")} type="number" className={`${inputStyle} pl-12`} placeholder="6500" />
                   </div>
                 </div>
               </div>
