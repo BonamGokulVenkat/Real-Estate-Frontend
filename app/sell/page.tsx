@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GeoapifyAutocomplete } from "@/components/common/ui/GeoapifyAutocomplete";
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -40,10 +39,53 @@ export default function Sell() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { formatPrice , currency , setCurrency } = useCurrency();
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-  const [selectedState, setSelectedState] = useState("");
+  
 
+  const geocodeAddress = async (
+      address: string,
+      city: string,
+      state: string,
+      zipCode: string
+    ) => {
+      const queries = [
+        `${address}, ${city}, ${state}, ${zipCode}`,
+        `${address}, ${city}, ${state}`,
+        `${address}, ${city}`,
+        `${city}, ${state}, ${zipCode}`,
+        `${city}, ${state}`,
+        state,
+      ];
+
+      for (const query of queries) {
+        const response = await fetch(
+          `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+            query
+          )}&limit=1&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`
+        );
+        if(!response.ok) {
+          continue;
+        }
+        const result = await response.json();
+        
+
+        if (result.features?.length > 0) {
+          const location = result.features[0];
+
+          return {
+            lat: location.properties.lat,
+            lng: location.properties.lon,
+            confidence:
+              query === `${address}, ${city}, ${state}, ${zipCode}`
+                ? "HIGH"
+                : query === `${address}, ${city}, ${state}`
+                ? "MEDIUM"
+                : "LOW",
+          };
+        }
+      }
+
+  return null;
+};
    const {
     register,
     handleSubmit,
@@ -71,12 +113,12 @@ export default function Sell() {
 
   const currentPrice = watch("price");
   const numericPrice = Number(currentPrice);
-const isNumericPrice =
-  currentPrice?.trim() !== "" &&
-  !isNaN(numericPrice) &&
-  isFinite(numericPrice) &&
-  numericPrice > 0;
-    const displayPrice = (price: string) => {
+  const isNumericPrice =
+    currentPrice?.trim() !== "" &&
+    !isNaN(numericPrice) &&
+    isFinite(numericPrice) &&
+    numericPrice > 0;
+  const displayPrice = (price: string) => {
     const num = Number(price);
 
     if (!isNaN(num) && isFinite(num)) {
@@ -160,12 +202,19 @@ const isNumericPrice =
         });
     }
 
-      if (lat === null || lng === null) {
-        toast.error("Please select a valid location from suggestions", { id: toastId });
+      const coordinates = await geocodeAddress(data.address, data.city, data.state, data.zipCode);
+      if(!coordinates) {
+        toast.error("unable to locate property. Please verify the address.",{id: toastId});
         setIsSubmitting(false);
         return;
-      }
 
+      }
+      const reverseResponse = await fetch(`https://api.geoapify.com/v1/geocode/reverse?lat=${coordinates?.lat}&lon=${coordinates?.lng}&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`);
+      const reverseData = await reverseResponse.json();
+      const reverseCity = reverseData.features[0]?.properties?.city || "";
+      if(reverseCity &&  reverseCity.toLowerCase() !== data.city.toLowerCase()) {
+        toast.warning("Address was approximated to nearest location. Please verify the address details.")
+      }
       toast.loading("Publishing property details...", { id: toastId });
 
       const payload = {
@@ -179,10 +228,10 @@ const isNumericPrice =
         location: {
           address: data.address,
           city: data.city,
-          state: selectedState || data.state,
+          state: data.state,
           zipCode: data.zipCode,
-          lat,
-          lng,
+          lat: coordinates?.lat,
+          lng: coordinates?.lng,
         },
         features: data.features,
         status: "available" as PropertyStatus,
@@ -191,6 +240,7 @@ const isNumericPrice =
       };
 
       const property = await propertyService.create(payload as any);
+      
       
       toast.success("Property submitted for admin approval!", { id: toastId });
       
@@ -341,29 +391,17 @@ const isNumericPrice =
 
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Search Location</label>
-                  <GeoapifyAutocomplete
-                    onSelect={(location) => {
-                      setValue("address", location.address);
-                      setValue("city", location.city);
-                      setValue("state", location.state);
-                      setLat(location.lat);
-                      setLng(location.lng);
-                      setSelectedState(location.state);
-                    }}
-                    onClear={() => {
-                      setValue("address", "");
-                      setValue("city", "");
-                      setValue("state", "");
-                      setLat(null);
-                      setLng(null);
-                      setSelectedState("");
-                    }}
-                  />
-                  <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5 mt-2">
-                    <span className="text-amber-500">📍</span>
-                    Your address will be geocoded automatically to enable location-based discovery.
-                  </p>
+                  <label className={labelStyle}>Street Address</label>
+                  <div className="space-y-1">
+                    <Input
+                      {...register("address", {
+                        required: "Street Address is required",
+                      })}
+                      className={inputStyle}
+                      placeholder="Flat No 101, Tridasa Apartments, MG Road"
+                    />
+                  </div>
+                  
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -373,7 +411,7 @@ const isNumericPrice =
                       {...register("city", { required: "City is required" })} 
                       className={inputStyle} 
                       placeholder="City" 
-                      readOnly 
+                       
                     />
                   </div>
                   <div className="space-y-1">
@@ -382,7 +420,7 @@ const isNumericPrice =
                       {...register("state", { required: "State is required" })} 
                       className={inputStyle} 
                       placeholder="State" 
-                      readOnly 
+                       
                     />
                   </div>
                   <div className="space-y-1">

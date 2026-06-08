@@ -280,7 +280,7 @@ export default function PropertyClient({
                   { label: "Status", value: property.status },
                   { label: "Listed", value: new Date(property.date_added).getFullYear().toString() },
                   { label: "Configuration", value: `${property.bedrooms} Bedrooms` },
-                  { label: "Land Area", value: `${property.size_sqft} Sq.Ft` },
+                  { label: "Land Area", value: property.size_sqft && property.size_sqft > 0 ? `${property.size_sqft} Sq.Ft` : `Not Disclosed` },
                   { label: "Reference", value: `LX-${property.property_id.slice(0, 8).toUpperCase()}` }
                 ].map((spec) => (
                   <div key={spec.label} className="space-y-2">
