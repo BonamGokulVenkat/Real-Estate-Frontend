@@ -1,9 +1,9 @@
 "use client";
 
 import React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Menu, User, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
@@ -29,56 +29,64 @@ const NAV_LINKS = [
   { label: "Sell Property", path: "/sell", icon: BadgeDollarSign },
 ] as const;
 
+const CURRENCIES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
+
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  
   const pathname = usePathname();
   const { currency, setCurrency } = useCurrency();
-  const CURRENCIES: CurrencyCode[] = ['INR', 'USD', 'EUR', 'GBP', 'AED'];
-
   const { user, isAuthenticated, logout } = useAuthStore();
+  
   const profileRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
+  const currencyRef = useRef<HTMLDivElement>(null);
 
-  // Fix: Close profile dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileOpen(false);
+        setProfileDropdownOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        setCurrencyDropdownOpen(false);
       }
     };
+    
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Handle scroll effect
   useEffect(() => {
-    setMounted(true);
-
-    // If Zustand's persisted state says "authenticated" but the actual
-    // auth cookie no longer exists (e.g. expired, other-tab logout, manual clear)
-    // → clear the stale store so the navbar shows Sign In / Sign Up correctly.
-    if (isAuthenticated && !Cookies.get("access_token")) {
-      logout();
-    }
-
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogout = () => {
+  // Check authentication on mount
+  useEffect(() => {
+    setMounted(true);
+    
+    if (isAuthenticated && !Cookies.get("access_token")) {
+      logout();
+    }
+  }, [isAuthenticated, logout]);
+
+  const handleLogout = useCallback(() => {
     logout();
     Cookies.remove("access_token");
     Cookies.remove("refresh_token");
-    setProfileOpen(false);
-    // Using window.location.href for a full reload to clear all state definitely
+    setProfileDropdownOpen(false);
+    setMobileMenuOpen(false);
     window.location.href = "/login";
-  };
+  }, [logout]);
 
-  // Logic remains same, but ensures variables are stable
+  const isLoggedIn = mounted && isAuthenticated && !!user && !!Cookies.get("access_token");
+  
   const visibleNavLinks = NAV_LINKS.filter((link) => {
     if (link.path === "/sell") {
       return user?.role !== "individual" && user?.role !== "admin";
@@ -86,13 +94,17 @@ export default function Navbar() {
     return true;
   });
 
-  // Show authenticated UI only when: fully mounted on client, store says authenticated,
-  // user object exists, AND the cookie is still present (guards against stale localStorage)
-  const isLoggedIn = mounted && isAuthenticated && !!user && !!Cookies.get("access_token");
+  const getUserInitials = () => {
+    if (!user?.name) return "U";
+    return user.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
-  const initials = user?.name
-    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
-    : "U";
+  const initials = getUserInitials();
 
   const ProfileAvatar = ({ size = "sm" }: { size?: "sm" | "lg" }) => (
     <div className={cn(
@@ -105,32 +117,38 @@ export default function Navbar() {
 
   return (
     <nav className={cn(
-      "fixed top-0 left-0 right-0 z-[100] transition-all duration-500 flex items-center",
+      "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
       scrolled
-        ? "bg-[#0A192F]/90 backdrop-blur-xl border-b border-white/5 h-20 shadow-2xl"
-        : "bg-transparent h-24"
+        ? "bg-[#0A192F]/95 backdrop-blur-md border-b border-white/10 h-16 lg:h-20"
+        : "bg-transparent h-20 lg:h-24"
     )}>
-      <div className="container mx-auto px-4 lg:px-8 flex items-center justify-between">
-
-        {/* ── Mobile Side Toggle ── */}
-        <div className="lg:hidden flex items-center">
-          <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+        
+        {/* Mobile Menu Button */}
+        <div className="lg:hidden">
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 -ml-2">
-                <Menu className="w-6 h-6" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-white hover:bg-white/10 -ml-2"
+                aria-label="Open menu"
+              >
+                <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
 
             <SheetContent
               side="left"
-              className="bg-[#0A192F] border-r border-white/10 text-white w-[300px] p-0 flex flex-col z-[110] [&>button]:hidden"
+              className="bg-[#0A192F] border-r border-white/10 text-white w-[280px] sm:w-[320px] p-0 flex flex-col"
             >
               <VisuallyHidden.Root>
                 <SheetTitle>Navigation Menu</SheetTitle>
                 <SheetDescription>Access main pages and account settings</SheetDescription>
               </VisuallyHidden.Root>
 
-              <div className="p-6 flex items-center justify-between border-b border-white/5 bg-[#0A192F]">
+              {/* Header */}
+              <div className="p-5 flex items-center justify-between border-b border-white/10">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-amber-500 rounded flex items-center justify-center">
                     <span className="text-[#0A192F] font-bold text-lg">L</span>
@@ -138,11 +156,12 @@ export default function Navbar() {
                   <span className="font-serif text-white text-xl font-bold">Luxora</span>
                 </div>
                 <SheetClose className="rounded-full p-2 hover:bg-white/10 transition-colors">
-                  <X className="w-5 h-5 text-white/50" />
+                  <X className="w-5 h-5 text-white/60" />
                 </SheetClose>
               </div>
 
-              <div className="flex-1 py-8 px-4 space-y-2 overflow-y-auto">
+              {/* Navigation Links */}
+              <div className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
                 {visibleNavLinks.map((link) => {
                   const isActive = pathname === link.path;
                   return (
@@ -150,32 +169,33 @@ export default function Navbar() {
                       <Link
                         href={link.path}
                         className={cn(
-                          "flex items-center gap-4 px-4 py-4 rounded-xl transition-all",
+                          "flex items-center gap-3 px-4 py-3 rounded-lg transition-all",
                           isActive
-                            ? "bg-amber-500 text-[#0A192F] font-bold"
-                            : "text-white/60 hover:text-white hover:bg-white/5"
+                            ? "bg-amber-500 text-[#0A192F] font-semibold"
+                            : "text-white/70 hover:text-white hover:bg-white/5"
                         )}
                       >
                         <link.icon className={cn("w-5 h-5", isActive ? "text-[#0A192F]" : "text-amber-500")} />
-                        <span className="text-base font-medium">{link.label}</span>
+                        <span className="text-base">{link.label}</span>
                       </Link>
                     </SheetClose>
                   );
                 })}
               </div>
 
-              <div className="p-6 border-t border-white/5 bg-black/20 space-y-3">
+              {/* User Actions */}
+              <div className="p-5 border-t border-white/10 space-y-3">
                 {isLoggedIn ? (
                   <>
-                    <div className="flex items-center gap-3 px-2 mb-2">
+                    <div className="flex items-center gap-3 px-2 pb-3">
                       <ProfileAvatar size="lg" />
-                      <div className="flex flex-col min-w-0">
+                      <div className="flex flex-col min-w-0 flex-1">
                         <span className="text-white font-semibold text-sm truncate">{user.name}</span>
                         <span className="text-white/40 text-xs truncate">{user.email}</span>
                       </div>
                     </div>
                     <SheetClose asChild>
-                      <Button asChild className="w-full bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl h-12 border border-white/10">
+                      <Button asChild className="w-full bg-white/10 hover:bg-white/20 text-white rounded-lg h-11">
                         <Link href="/profile">
                           <User className="w-4 h-4 mr-2" />
                           My Profile
@@ -185,7 +205,8 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Button
                         onClick={handleLogout}
-                        className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold rounded-xl h-12"
+                        variant="destructive"
+                        className="w-full rounded-lg h-11"
                       >
                         <LogOut className="w-4 h-4 mr-2" />
                         Sign Out
@@ -195,7 +216,7 @@ export default function Navbar() {
                 ) : (
                   <>
                     <SheetClose asChild>
-                      <Button asChild className="w-full bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl h-14 border border-white/10">
+                      <Button asChild variant="outline" className="w-full border-white/20 text-white hover:bg-white/10 rounded-lg h-11">
                         <Link href="/login">
                           <User className="w-4 h-4 mr-2" />
                           Sign In
@@ -203,19 +224,21 @@ export default function Navbar() {
                       </Button>
                     </SheetClose>
                     <SheetClose asChild>
-                      <Button asChild className="w-full bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-bold rounded-xl h-14 shadow-lg shadow-amber-500/10">
+                      <Button asChild className="w-full bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-semibold rounded-lg h-11">
                         <Link href="/signup">Sign Up</Link>
                       </Button>
                     </SheetClose>
                   </>
                 )}
-                <div className="flex items-center justify-between mt-6 px-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white/40 text-xs uppercase font-bold tracking-widest">Currency</span>
+                
+                {/* Currency Selector */}
+                <div className="pt-4 mt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-white/40 text-xs font-medium">Currency</span>
                     <select
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value as CurrencyCode)}
-                      className="bg-transparent text-amber-500 font-bold text-sm outline-none cursor-pointer appearance-none ml-2"
+                      className="bg-white/10 text-amber-500 font-semibold text-sm rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                     >
                       {CURRENCIES.map(code => (
                         <option key={code} value={code} className="bg-[#0A192F] text-white">{code}</option>
@@ -228,31 +251,35 @@ export default function Navbar() {
           </Sheet>
         </div>
 
-        {/* ── Logo ── */}
+        {/* Logo */}
         <Link
           href="/"
-          className={cn(
-            "flex items-center gap-2 group shrink-0 transition-opacity duration-300",
-            isOpen ? "opacity-0" : "opacity-100"
-          )}
+          className="flex items-center gap-2 lg:gap-3 group shrink-0"
         >
-          <div className="w-8 h-8 bg-amber-500 rounded flex items-center justify-center transition-transform group-hover:rotate-12">
-            <span className="text-[#0A192F] font-bold text-lg">L</span>
+          <div className="w-7 h-7 lg:w-8 lg:h-8 bg-amber-500 rounded flex items-center justify-center transition-transform group-hover:scale-105">
+            <span className="text-[#0A192F] font-bold text-base lg:text-lg">L</span>
           </div>
-          <span className="font-serif text-xl lg:text-2xl font-bold tracking-tight text-white">
-            Luxora <span className="text-amber-500">Estates</span>
-          </span>
+          <div className="flex flex-col">
+            <span className="font-serif text-lg lg:text-xl font-bold text-white">
+              Luxora <span className="text-amber-500">Estates</span>
+            </span>
+            <span className="hidden sm:block text-[10px] lg:text-xs text-amber-400/70 leading-tight">
+              Luxury Property Opportunities
+            </span>
+          </div>
         </Link>
 
-        {/* ── Desktop Nav ── */}
-        <div className="hidden lg:flex items-center absolute left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full px-1.5 py-1.5">
+        {/* Desktop Navigation */}
+        <div className="hidden lg:flex items-center gap-1 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full p-1">
           {visibleNavLinks.map((link) => (
             <Link
               key={link.path}
               href={link.path}
               className={cn(
-                "px-6 py-2 rounded-full text-sm font-medium transition-all duration-300",
-                pathname === link.path ? "bg-amber-500 text-[#0A192F]" : "text-white/60 hover:text-white"
+                "px-5 py-2 rounded-full text-sm font-medium transition-all duration-200",
+                pathname === link.path 
+                  ? "bg-amber-500 text-[#0A192F]" 
+                  : "text-white/70 hover:text-white hover:bg-white/10"
               )}
             >
               {link.label}
@@ -260,101 +287,108 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* ── Right Action (Mobile) ── */}
-        <div className={cn(
-          "shrink-0 transition-opacity duration-300 lg:hidden",
-          isOpen ? "opacity-0" : "opacity-100"
-        )}>
-          {isLoggedIn ? (
-            <Link href="/profile">
-              <ProfileAvatar size="sm" />
-            </Link>
-          ) : (
-            <Link href="/login" className="text-white/80">
-              <User className="w-6 h-6" />
-            </Link>
-          )}
-        </div>
-
-        {/* ── Right Actions (Desktop) ── */}
-        <div className="hidden lg:flex items-center gap-6 relative">
-
-          {/* Currency Dropdown */}
-          <div className="relative group cursor-pointer flex items-center gap-1.5 text-white/60 hover:text-amber-500 font-medium text-sm transition-colors">
-            <span>{currency}</span>
-            <ChevronDown className="w-4 h-4" />
-            <div className="absolute top-full right-0 mt-2 w-24 bg-[#0A192F]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
-              {CURRENCIES.map(code => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => setCurrency(code)}
-                  className={cn(
-                    "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-white/10",
-                    currency === code ? "text-amber-500 font-bold" : "text-white/80"
-                  )}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
+        {/* Right Actions */}
+        <div className="flex items-center gap-4">
+          {/* Mobile Profile */}
+          <div className="lg:hidden">
+            {isLoggedIn ? (
+              <Link href="/profile">
+                <ProfileAvatar size="sm" />
+              </Link>
+            ) : (
+              <Link href="/login" className="text-white">
+                <User className="w-5 h-5" />
+              </Link>
+            )}
           </div>
 
-          {/* Auth Section */}
-          {isLoggedIn ? (
-            <div className="relative" ref={profileRef}>
+          {/* Desktop Actions */}
+          <div className="hidden lg:flex items-center gap-4">
+            {/* Currency Dropdown */}
+            <div className="relative" ref={currencyRef}>
               <button
-                type="button"
-                onClick={() => setProfileOpen((prev) => !prev)}
-                className="flex items-center gap-2 focus:outline-none"
+                onClick={() => setCurrencyDropdownOpen(prev => !prev)}
+                className="flex items-center gap-1.5 text-white/70 hover:text-amber-500 text-sm font-medium transition-colors"
+                aria-label="Select currency"
               >
-                <ProfileAvatar size="sm" />
-                <div className="flex flex-col items-start leading-tight">
-                  <span className="text-white text-sm font-semibold max-w-[100px] truncate">{user.name}</span>
-                  <span className="text-white/40 text-xs capitalize">{user.role}</span>
-                </div>
-                <ChevronDown className={cn("w-4 h-4 text-white/40 transition-transform", profileOpen && "rotate-180")} />
+                <span>{currency}</span>
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", currencyDropdownOpen && "rotate-180")} />
               </button>
 
-              {profileOpen && (
-                <div className="absolute top-full right-0 mt-3 w-52 bg-[#0A192F]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[110]">
-                  <div className="p-4 border-b border-white/5">
-                    <p className="text-white font-semibold text-sm truncate">{user.name}</p>
-                    <p className="text-white/40 text-xs truncate">{user.email}</p>
-                  </div>
-                  <div className="p-2">
-                    <Link
-                      href="/profile"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/5 text-sm transition-colors"
-                    >
-                      <User className="w-4 h-4 text-amber-500" />
-                      My Profile
-                    </Link>
+              {currencyDropdownOpen && (
+                <div className="absolute top-full right-0 mt-2 w-24 bg-[#0A192F] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50">
+                  {CURRENCIES.map(code => (
                     <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm transition-colors mt-1"
+                      key={code}
+                      onClick={() => {
+                        setCurrency(code);
+                        setCurrencyDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm transition-colors hover:bg-white/10",
+                        currency === code ? "text-amber-500 font-semibold" : "text-white/80"
+                      )}
                     >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
+                      {code}
                     </button>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Button asChild className="rounded-xl px-6 h-11 bg-white/10 hover:bg-white/20 text-white border border-white/10 font-semibold">
-                <Link href="/login" className="flex items-center gap-2">
-                  <User className="w-4 h-4" /> Sign In
-                </Link>
-              </Button>
-              <Button asChild className="rounded-xl px-6 h-11 bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-bold shadow-lg shadow-amber-500/10 transition-all">
-                <Link href="/signup">Sign Up</Link>
-              </Button>
-            </div>
-          )}
+
+            {/* Auth Section */}
+            {isLoggedIn ? (
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setProfileDropdownOpen(prev => !prev)}
+                  className="flex items-center gap-2 focus:outline-none group"
+                  aria-label="Profile menu"
+                >
+                  <ProfileAvatar size="sm" />
+                  <div className="hidden xl:flex flex-col items-start leading-tight">
+                    <span className="text-white text-sm font-semibold max-w-[120px] truncate">{user.name}</span>
+                    <span className="text-white/40 text-xs capitalize">{user.role}</span>
+                  </div>
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-white/40 transition-transform", profileDropdownOpen && "rotate-180")} />
+                </button>
+
+                {profileDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-56 bg-[#0A192F] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-white/10">
+                      <p className="text-white font-semibold text-sm truncate">{user.name}</p>
+                      <p className="text-white/40 text-xs truncate mt-0.5">{user.email}</p>
+                    </div>
+                    <div className="p-1">
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2 rounded-md text-white/70 hover:text-white hover:bg-white/10 text-sm transition-colors"
+                      >
+                        <User className="w-4 h-4 text-amber-500" />
+                        My Profile
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button asChild variant="ghost" className="text-white hover:bg-white/10 rounded-lg h-10">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild className="bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-semibold rounded-lg h-10 px-5">
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>
