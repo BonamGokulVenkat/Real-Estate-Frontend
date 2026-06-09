@@ -1,3 +1,4 @@
+// lib/apiClient.ts
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
@@ -5,12 +6,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor to add the JWT token to requests
+// Request interceptor — attach token
 apiClient.interceptors.request.use(
   (config) => {
     const token = Cookies.get('access_token');
@@ -22,16 +21,76 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle 401 Unauthorized errors globally
+// Track if we're already refreshing to avoid infinite loops
+let isRefreshing = false;
+let failedQueue: { resolve: Function; reject: Function }[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
+// Response interceptor — handle 401 with refresh
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle session expiration (e.g., clear cookies, redirect to login)
-      Cookies.remove('access_token');
-      // If running on client, you might redirect:
-      // if (typeof window !== 'undefined') window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // If already refreshing, queue this request
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            return apiClient(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Call your refresh endpoint
+        const refreshToken = Cookies.get('refresh_token');
+        const { data } = await axios.post(`${API_URL}/auth/refresh-token`, {
+          refresh_token: refreshToken,
+        });
+
+        const newAccessToken = data.access_token;
+
+        // Save new token
+        Cookies.set('access_token', newAccessToken, { expires: 1 }); // 1 day
+
+        // Update default header
+        apiClient.defaults.headers['Authorization'] = `Bearer ${newAccessToken}`;
+
+        processQueue(null, newAccessToken);
+
+        // Retry original request with new token
+        originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        return apiClient(originalRequest);
+
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+
+        // Refresh failed — clear cookies and redirect to login
+        Cookies.remove('access_token');
+        Cookies.remove('refresh_token');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     return Promise.reject(error);
   }
 );

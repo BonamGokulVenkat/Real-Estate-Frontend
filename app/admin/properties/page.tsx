@@ -262,7 +262,7 @@ function PropertyPreviewModal({
                   { label: "Status", value: property.status },
                   { label: "Bedrooms", value: `${property.bedrooms} BHK` },
                   { label: "Bathrooms", value: `${property.bathrooms}` },
-                  { label: "Area", value: `${property.size_sqft} Sq.Ft` },
+                  { label: "Area", value: property.size_sqft && property.size_sqft > 0  ? `${property.size_sqft} Sq.Ft` : `Not Disclosed` },
                   { label: "Listed", value: new Date(property.date_added).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
                 ].map((s) => (
                   <div key={s.label} className="space-y-1">

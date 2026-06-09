@@ -56,7 +56,18 @@ export const useCurrency = () => {
   };
 
   // Formats price from base INR to selected currency
- const formatPrice = (priceInINR: number) => {
+ const formatPrice = (priceInINR: string | number) => {
+  // Handle custom text prices
+  if (typeof priceInINR === "string") {
+    const numericValue = Number(priceInINR);
+
+    if (isNaN(numericValue)) {
+      return priceInINR; // "Price on Request"
+    }
+
+    priceInINR = numericValue;
+  }
+
   const convertedPrice = getConvertedPrice(priceInINR);
 
   if (!convertedPrice) return "₹0";

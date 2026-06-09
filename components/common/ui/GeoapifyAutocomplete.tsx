@@ -17,7 +17,7 @@ interface GeoapifyAutocompleteProps {
   defaultValue?: string;
 }
 
-const GEOAPIFY_API_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY || "dummy_key";
+const GEOAPIFY_API_KEY = process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY;
 
 export function GeoapifyAutocomplete({ onSelect, onClear, className, defaultValue = "" }: GeoapifyAutocompleteProps) {
   const [inputValue, setInputValue] = useState(defaultValue);

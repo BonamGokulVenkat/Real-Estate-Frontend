@@ -5,7 +5,6 @@ import { useForm } from "react-hook-form";
 import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { GeoapifyAutocomplete } from "@/components/common/ui/GeoapifyAutocomplete";
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -24,8 +23,8 @@ interface SellForm {
   type: string;
   bedrooms: number;
   bathrooms: number;
-  size: number;
-  price: number;
+  size?: number;
+  price: string;
   address: string;
   city: string;
   state: string;
@@ -40,10 +39,53 @@ export default function Sell() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { formatPrice , currency , setCurrency } = useCurrency();
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-  const [selectedState, setSelectedState] = useState("");
+  
 
+  const geocodeAddress = async (
+      address: string,
+      city: string,
+      state: string,
+      zipCode: string
+    ) => {
+      const queries = [
+        `${address}, ${city}, ${state}, ${zipCode}`,
+        `${address}, ${city}, ${state}`,
+        `${address}, ${city}`,
+        `${city}, ${state}, ${zipCode}`,
+        `${city}, ${state}`,
+        state,
+      ];
+
+      for (const query of queries) {
+        const response = await fetch(
+          `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
+            query
+          )}&limit=1&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`
+        );
+        if(!response.ok) {
+          continue;
+        }
+        const result = await response.json();
+        
+
+        if (result.features?.length > 0) {
+          const location = result.features[0];
+
+          return {
+            lat: location.properties.lat,
+            lng: location.properties.lon,
+            confidence:
+              query === `${address}, ${city}, ${state}, ${zipCode}`
+                ? "HIGH"
+                : query === `${address}, ${city}, ${state}`
+                ? "MEDIUM"
+                : "LOW",
+          };
+        }
+      }
+
+  return null;
+};
    const {
     register,
     handleSubmit,
@@ -70,6 +112,29 @@ export default function Sell() {
  
 
   const currentPrice = watch("price");
+  const numericPrice = Number(currentPrice);
+  const isNumericPrice =
+    currentPrice?.trim() !== "" &&
+    !isNaN(numericPrice) &&
+    isFinite(numericPrice) &&
+    numericPrice > 0;
+  const displayPrice = (price: string) => {
+    const num = Number(price);
+
+    if (!isNaN(num) && isFinite(num)) {
+      return formatPrice(num);
+    }
+
+    return price;
+  };
+  const normalizeFile = (file: File): File => {
+  if (file.name.toLowerCase().endsWith('.jfif')) {
+    return new File([file], file.name.replace(/\.jfif$/i, '.jpg'), {
+      type: 'image/jpeg',
+    });
+  }
+  return file;
+};
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -87,6 +152,9 @@ export default function Sell() {
   };
 
   const onSubmit = async (data: SellForm) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log("SESSION AT UPLOAD:", session);
+    console.log("USER ID:", user?.user_id);
     if (!user) {
       toast.error("You must be logged in to create a listing.");
       return;
@@ -102,38 +170,51 @@ export default function Sell() {
     try {
       const uploadedMedia = [];
 
-      for (const [index, file] of files.entries()) {
-        const fileExt = file.name.split('.').pop();
+      // Replace the entire supabase.storage.upload block with this:
+      for (const [index, rawFile] of files.entries()) {
+        const file = normalizeFile(rawFile); // your .jfif normalizer
+        const fileExt = file.name.split(".").pop();
         const fileName = `${uuidv4()}.${fileExt}`;
-        const filePath = `${user.user_id || crypto.randomUUID()}/${fileName}`;
+        const filePath = `${user.user_id}/${fileName}`;
 
-        const { error: uploadError, data: uploadData } = await supabase.storage
-          .from('properties')
-          .upload(filePath, file);
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("filePath", filePath);
 
-        if (uploadError) {
-          throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`);
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const { error } = await res.json();
+          throw new Error(`Failed to upload ${file.name}: ${error}`);
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('properties')
-          .getPublicUrl(filePath);
+        const { publicUrl } = await res.json();
 
         uploadedMedia.push({
-          media_type: file.type.startsWith('video/') ? 'video' : 'image',
-          room_type: 'other',
+          media_type: file.type.startsWith("video/") ? "video" : "image",
+          room_type: "other",
           url: publicUrl,
           thumbnail_url: publicUrl,
           display_order: index,
         });
-      }
+    }
 
-      if (lat === null || lng === null) {
-        toast.error("Please select a valid location from suggestions", { id: toastId });
+      const coordinates = await geocodeAddress(data.address, data.city, data.state, data.zipCode);
+      if(!coordinates) {
+        toast.error("unable to locate property. Please verify the address.",{id: toastId});
         setIsSubmitting(false);
         return;
-      }
 
+      }
+      const reverseResponse = await fetch(`https://api.geoapify.com/v1/geocode/reverse?lat=${coordinates?.lat}&lon=${coordinates?.lng}&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`);
+      const reverseData = await reverseResponse.json();
+      const reverseCity = reverseData.features[0]?.properties?.city || "";
+      if(reverseCity &&  reverseCity.toLowerCase() !== data.city.toLowerCase()) {
+        toast.warning("Address was approximated to nearest location. Please verify the address details.")
+      }
       toast.loading("Publishing property details...", { id: toastId });
 
       const payload = {
@@ -142,15 +223,15 @@ export default function Sell() {
         property_type: data.type.toLowerCase() as PropertyType,
         bedrooms: Number(data.bedrooms),
         bathrooms: Number(data.bathrooms),
-        size_sqft: Number(data.size),
-        price: Number(data.price),
+        size_sqft: data.size ? Number(data.size) : null,
+        price: data.price,
         location: {
           address: data.address,
           city: data.city,
-          state: selectedState || data.state,
+          state: data.state,
           zipCode: data.zipCode,
-          lat,
-          lng,
+          lat: coordinates?.lat,
+          lng: coordinates?.lng,
         },
         features: data.features,
         status: "available" as PropertyStatus,
@@ -159,6 +240,7 @@ export default function Sell() {
       };
 
       const property = await propertyService.create(payload as any);
+      
       
       toast.success("Property submitted for admin approval!", { id: toastId });
       
@@ -268,14 +350,14 @@ export default function Sell() {
                     </select>
                     </div>
                     <div className="space-y-1 w-58">
-                      <Input {...register("price", { required: "Price is required" })} type="number" className={`${inputStyle} pl-12`} placeholder="120000000" />
+                      <Input {...register("price", { required: "Price is required" })} type="text" className={`${inputStyle} pl-12`} placeholder="120000000 or Price on Request" />
                     </div>
                   </div>
-                  {currentPrice > 0 && (
+                  {isNumericPrice && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      {currentPrice > 0 && (
+                      {isNumericPrice && (
                         <span className="text-amber-500 text-xs mt-2">
-                          Estimated: {formatPrice(currentPrice)} 
+                          Estimated: {formatPrice(numericPrice)}
                         </span>
                       )}
                     </p>
@@ -302,36 +384,24 @@ export default function Sell() {
                   <label className={labelStyle}>Sqft</label>
                   <div className="relative">
                     <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input {...register("size", { required: "Required" })} type="number" className={`${inputStyle} pl-12`} placeholder="6500" />
+                    <Input {...register("size")} type="number" className={`${inputStyle} pl-12`} placeholder="6500" />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Search Location</label>
-                  <GeoapifyAutocomplete
-                    onSelect={(location) => {
-                      setValue("address", location.address);
-                      setValue("city", location.city);
-                      setValue("state", location.state);
-                      setLat(location.lat);
-                      setLng(location.lng);
-                      setSelectedState(location.state);
-                    }}
-                    onClear={() => {
-                      setValue("address", "");
-                      setValue("city", "");
-                      setValue("state", "");
-                      setLat(null);
-                      setLng(null);
-                      setSelectedState("");
-                    }}
-                  />
-                  <p className="text-white/20 text-[10px] font-medium flex items-center gap-1.5 mt-2">
-                    <span className="text-amber-500">📍</span>
-                    Your address will be geocoded automatically to enable location-based discovery.
-                  </p>
+                  <label className={labelStyle}>Street Address</label>
+                  <div className="space-y-1">
+                    <Input
+                      {...register("address", {
+                        required: "Street Address is required",
+                      })}
+                      className={inputStyle}
+                      placeholder="Flat No 101, Tridasa Apartments, MG Road"
+                    />
+                  </div>
+                  
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -341,7 +411,7 @@ export default function Sell() {
                       {...register("city", { required: "City is required" })} 
                       className={inputStyle} 
                       placeholder="City" 
-                      readOnly 
+                       
                     />
                   </div>
                   <div className="space-y-1">
@@ -350,7 +420,7 @@ export default function Sell() {
                       {...register("state", { required: "State is required" })} 
                       className={inputStyle} 
                       placeholder="State" 
-                      readOnly 
+                       
                     />
                   </div>
                   <div className="space-y-1">

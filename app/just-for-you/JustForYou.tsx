@@ -76,12 +76,16 @@ export default function JustForYou() {
       if (cityFilter !== "all") params.city = cityFilter;
       if (maxPrice[0] < 100000000) params.max_price = maxPrice[0];
       if (minBeds > 0) params.bedrooms = minBeds;
+      console.log("SEARCH PARAMS:", params);
 
       const data = await propertyService.search(params);
-
+      const getNumericPrice = (price: string)=>{
+        const num = Number(price);
+        return isNaN(num) ? Number.MAX_SAFE_INTEGER : num;
+      }
       let sorted = [...data];
-      if (sortBy === "price-asc") sorted.sort((a, b) => a.price - b.price);
-      if (sortBy === "price-desc") sorted.sort((a, b) => b.price - a.price);
+      if (sortBy === "price-asc") sorted.sort((a, b) => getNumericPrice(a.price) - getNumericPrice(b.price));
+      if (sortBy === "price-desc") sorted.sort((a, b) => getNumericPrice(b.price) - getNumericPrice(a.price));
 
       return sorted;
     },
