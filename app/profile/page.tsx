@@ -1,89 +1,148 @@
+// app/profile/page.tsx
 "use client";
 
 import { motion } from "framer-motion";
 import {
   Heart, Home, Edit, ShieldCheck, Loader2, ArrowUpRight,
-  Phone, Mail, Building2, Sparkles, MapPin, Star
+  Phone, Mail, Building2, Sparkles, MapPin, Star, Clock, AlertTriangle, CheckCircle, XCircle
 } from "lucide-react";
 import PropertyCard from "@/components/common/PropertyCard";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
 import { favouriteService } from "@/services/favouriteService";
-import { propertyService } from "@/services/propertyService";
-import { useQuery } from "@tanstack/react-query";
+import { propertyService, Property } from "@/services/propertyService";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCurrency } from "@/hooks/useCurrency";
 import EditProfileModal from "@/components/common/EditProfileModel";
 import Link from "next/link";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function Profile() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
+  const queryClient = useQueryClient();
+  const { formatPrice, getConvertedPrice } = useCurrency();
 
-  useEffect(() => {
-    if (!isAuthenticated) router.push("/login");
-  }, [isAuthenticated, router]);
-
-  const { data: favorites, isLoading: loadingFavs } = useQuery({
+  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // These hooks will always be called in the same order
+  const { data: favorites = [], isLoading: loadingFavs } = useQuery({
     queryKey: ["favorites"],
     queryFn: favouriteService.getFavorites,
     enabled: isAuthenticated && !!user,
   });
 
-  const { data: myProperties, isLoading: loadingProps } = useQuery({
+  const { data: myProperties = [], isLoading: loadingProps } = useQuery({
     queryKey: ["properties", "my-listings", user?.user_id],
-    queryFn: () => propertyService.search({ builder: user?.user_id }),
+    queryFn: propertyService.getMyProperties,
     enabled: isAuthenticated && user?.role === "builder",
   });
 
-  const { formatPrice, getConvertedPrice } = useCurrency();
+  const deleteRequestMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => 
+      propertyService.requestDelete(id, reason),
+    onSuccess: () => {
+      toast.success("Deletion request submitted. Awaiting admin approval.");
+      queryClient.invalidateQueries({ queryKey: ["properties", "my-listings"] });
+      setPropertyToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to submit deletion request");
+      setPropertyToDelete(null);
+    },
+  });
 
-  if (!isAuthenticated || !user) {
+  // ✅ useEffect is also a hook, must be called unconditionally
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // ✅ Now we can have conditional returns AFTER all hooks
+  if (authLoading) {
     return (
       <div className="min-h-screen pt-32 flex justify-center bg-[#0A192F]">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
       </div>
     );
   }
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  // Helper functions (not hooks, so these are fine after returns)
+  const saved = favorites?.map((f: any) => f.property) || [];
+  const listed = myProperties || [];
+  
   const getNumericPrice = (price: string) => {
     const num = Number(price);
-    return isNaN(num) ? Number.MAX_SAFE_INTEGER : num;
-  }
-  const saved = favorites?.map((f) => f.property) || [];
-  const listed = myProperties || [];
+    return isNaN(num) ? 0 : num;
+  };
+  
   const totalValue = listed.reduce(
     (sum, p) => sum + getConvertedPrice(getNumericPrice(p.price)),
     0
   );
-  const experienceYears = new Date().getFullYear() - new Date(user.date_joined ?? new Date()).getFullYear();
+  
+  const experienceYears = user.date_joined 
+    ? new Date().getFullYear() - new Date(user.date_joined).getFullYear()
+    : 0;
 
   const initials = user.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
+  const getStatusBadge = (status: string, pendingAction?: string) => {
+    if (status === "edit_pending") {
+      return { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Clock, text: "Edit Pending" };
+    }
+    if (status === "delete_pending") {
+      return { color: "bg-orange-500/20 text-orange-400 border-orange-500/30", icon: AlertTriangle, text: "Delete Pending" };
+    }
+    if (status === "pending") {
+      return { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: Clock, text: "Pending Approval" };
+    }
+    if (status === "available") {
+      return { color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: CheckCircle, text: "Live" };
+    }
+    if (status === "rejected") {
+      return { color: "bg-red-500/20 text-red-400 border-red-500/30", icon: XCircle, text: "Rejected" };
+    }
+    return { color: "bg-white/10 text-white/40 border-white/10", icon: AlertTriangle, text: status };
+  };
+
   return (
     <div className="min-h-screen pt-28 pb-24 bg-[#0A192F] text-white selection:bg-amber-500/30">
-      {/* Atmospheric glow */}
       <div className="absolute top-0 left-0 w-full h-[700px] bg-[radial-gradient(ellipse_at_50%_0%,rgba(245,158,11,0.06)_0%,transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-8 max-w-6xl relative z-10">
-
-        {/* ── Hero Profile Card ── */}
+        {/* Hero Profile Card */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7 }}
           className="relative bg-white/[0.03] backdrop-blur-3xl rounded-[40px] border border-white/10 shadow-2xl mb-8 overflow-hidden"
         >
-          {/* Subtle corner glow */}
           <div className="absolute -top-20 -right-20 w-64 h-64 bg-amber-500/5 rounded-full blur-[80px] pointer-events-none" />
 
           <div className="p-8 lg:p-12">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-
-              {/* Avatar */}
               <div className="relative shrink-0">
                 <div className="w-28 h-28 lg:w-36 lg:h-36 rounded-[28px] overflow-hidden border-2 border-white/10 bg-[#0D2137] flex items-center justify-center shadow-2xl">
                   {user.avatar_url ? (
@@ -97,7 +156,6 @@ export default function Profile() {
                 </div>
               </div>
 
-              {/* Info */}
               <div className="flex-1 text-center md:text-left min-w-0">
                 <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
                   <h1 className="font-serif text-4xl lg:text-5xl font-bold tracking-tight text-white">
@@ -116,7 +174,6 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Contact row */}
                 <div className="flex flex-wrap items-center gap-4 justify-center md:justify-start mb-4">
                   <span className="flex items-center gap-2 text-white/40 text-sm">
                     <Mail className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
@@ -136,14 +193,12 @@ export default function Profile() {
                   )}
                 </div>
 
-                {/* Bio */}
                 {user.bio && (
                   <p className="text-white/50 text-sm font-light leading-relaxed max-w-lg mb-4 italic font-serif">
                     &ldquo;{user.bio}&rdquo;
                   </p>
                 )}
 
-                {/* Specializations */}
                 {user.role === "builder" && user.specializations && user.specializations.length > 0 && (
                   <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                     {user.specializations.map((s) => (
@@ -155,7 +210,6 @@ export default function Profile() {
                 )}
               </div>
 
-              {/* Edit button */}
               <div className="shrink-0">
                 <Button
                   onClick={() => setIsEditOpen(true)}
@@ -170,7 +224,7 @@ export default function Profile() {
           </div>
         </motion.div>
 
-        {/* ── Builder Agency Link ── */}
+        {/* Builder Agency Link */}
         {user.role === "builder" && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -196,14 +250,13 @@ export default function Profile() {
           </motion.div>
         )}
 
-        {/* ── Stats Bento ── */}
+        {/* Stats Bento */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
           className={`grid gap-6 mb-12 ${user.role === "builder" ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2"}`}
         >
-          {/* Saved */}
           <div className="bg-white/[0.02] border border-white/10 rounded-[28px] p-7 text-center group hover:border-amber-500/30 transition-all duration-500">
             <div className="w-11 h-11 bg-[#0D2137] rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/5 group-hover:scale-110 transition-transform">
               <Heart className="w-5 h-5 text-amber-500" />
@@ -214,7 +267,6 @@ export default function Profile() {
             <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">Saved Estates</div>
           </div>
 
-          {/* Builder stats */}
           {user.role === "builder" && (
             <>
               <div className="bg-white/[0.02] border border-white/10 rounded-[28px] p-7 text-center group hover:border-amber-500/30 transition-all duration-500">
@@ -250,7 +302,7 @@ export default function Profile() {
           )}
         </motion.div>
 
-        {/* ── Saved Properties ── */}
+        {/* Saved Properties */}
         <motion.section
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -273,7 +325,7 @@ export default function Profile() {
             </div>
           ) : saved.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {saved.map((p: any, i: number) => (
+              {saved.map((p: Property, i: number) => (
                 <PropertyCard key={p.property_id} property={p} index={i} />
               ))}
             </div>
@@ -286,7 +338,7 @@ export default function Profile() {
           )}
         </motion.section>
 
-        {/* ── Builder Listings ── */}
+        {/* Builder Listings */}
         {user.role === "builder" && (
           <motion.section
             initial={{ opacity: 0, y: 16 }}
@@ -301,7 +353,7 @@ export default function Profile() {
               </div>
               <Link
                 href="/sell"
-                className="text-[10px] font-bold uppercase tracking-widest text-amber-500/60 hover:text-amber-500 transition-colors flex items-center gap-1"
+                className="text-[10px] font-bold uppercase tracking-widest text-amber-500/60 hover:text-amber-500 transition-colors"
               >
                 + Add New
               </Link>
@@ -313,9 +365,62 @@ export default function Profile() {
               </div>
             ) : listed.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {listed.map((p: any, i: number) => (
-                  <PropertyCard key={p.property_id} property={p} index={i} />
-                ))}
+                {listed.map((p: Property, i: number) => {
+                  const statusBadge = getStatusBadge(p.status, p.pending_action);
+                  const StatusIcon = statusBadge.icon;
+                  
+                  return (
+                    <div key={p.property_id} className="relative group">
+                      <PropertyCard property={p} index={i} />
+                      
+                      <div className="absolute top-4 left-4 z-20">
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}>
+                          <StatusIcon className="w-3 h-3" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">{statusBadge.text}</span>
+                        </div>
+                      </div>
+                      
+                      {p.status === "available" && (
+                        <div className="absolute bottom-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link href={`/edit-property/${p.property_id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3 bg-white/10 border-white/20 text-white text-[10px] font-bold rounded-lg hover:bg-amber-500 hover:border-amber-500"
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Edit
+                            </Button>
+                          </Link>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPropertyToDelete(p)}
+                            className="h-8 px-3 bg-red-500/10 border-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-500 hover:text-white"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {p.status === "edit_pending" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-blue-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">
+                            Awaiting admin approval for edits
+                          </p>
+                        </div>
+                      )}
+                      
+                      {p.status === "delete_pending" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-orange-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-orange-400 text-[9px] font-bold uppercase tracking-wider">
+                            Deletion request pending admin approval
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="py-24 text-center bg-white/[0.01] rounded-[40px] border border-dashed border-white/10">
@@ -332,7 +437,36 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Edit modal */}
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!propertyToDelete} onOpenChange={() => setPropertyToDelete(null)}>
+        <AlertDialogContent className="bg-[#0D2137] border border-white/10 text-white rounded-3xl max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-serif">Request Property Deletion?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/50 text-sm leading-relaxed">
+              This will send a deletion request to the admin. Once approved, 
+              <span className="text-amber-400 font-semibold mx-1">{propertyToDelete?.title}</span>
+              will be permanently removed from the platform.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-3 mt-2">
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl px-6 h-11 flex-1">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteRequestMutation.mutate({ id: propertyToDelete?.property_id || "" })}
+              disabled={deleteRequestMutation.isPending}
+              className="bg-orange-500 hover:bg-orange-600 text-white border-none rounded-xl px-6 h-11 font-bold flex-1 disabled:opacity-60"
+            >
+              {deleteRequestMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+              ) : (
+                "Request Deletion"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <EditProfileModal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} />
     </div>
   );
