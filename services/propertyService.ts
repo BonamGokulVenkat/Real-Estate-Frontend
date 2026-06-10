@@ -23,7 +23,7 @@ export interface Property {
   property_type: PropertyType;
   bedrooms: number;
   bathrooms: number;
-  size_sqft: number;
+  size_sqft: number | null;
   price: string;
   location: {
     address: string;
