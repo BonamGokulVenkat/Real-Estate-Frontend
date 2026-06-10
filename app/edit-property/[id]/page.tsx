@@ -249,7 +249,7 @@ export default function EditProperty() {
           address: data.address,
           city: data.city,
           state: data.state,
-          zipCode: data.zipCode,
+          zipCode: Number(data.zipCode),
           lat: coordinates.lat,
           lng: coordinates.lng,
         },
