@@ -43,13 +43,12 @@ export default function Login() {
       const profile = data.user as unknown as UserProfile;
       setUser(profile);
 
-      // Redirect
       if (profile.role === "admin") {
-        window.location.href = "/admin";
+        router.push("/admin");
       } else if (profile.role === "builder") {
-        window.location.href = "/sell";
+        router.push("/sell");
       } else {
-        window.location.href = "/";
+        router.push("/");
       }
 
     } catch (error: any) {
