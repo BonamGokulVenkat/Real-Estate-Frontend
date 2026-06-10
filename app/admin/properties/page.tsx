@@ -68,6 +68,10 @@ export default function ManageProperties() {
     queryFn: propertyService.getPendingRequests,
   });
 
+  // Safe defaults
+  const editPending = pendingRequests?.edit_pending ?? [];
+  const deletePending = pendingRequests?.delete_pending ?? [];
+
   // Mutations
   const deleteMutation = useMutation({
     mutationFn: propertyService.directDelete,
@@ -168,7 +172,7 @@ export default function ManageProperties() {
             New Pending ({pendingProperties.length})
           </TabsTrigger>
           <TabsTrigger value="requests" className="text-xs font-bold uppercase tracking-widest data-[state=active]:bg-amber-500 data-[state=active]:text-[#0A192F]">
-            Requests ({ (pendingRequests?.edit_pending?.length || 0) + (pendingRequests?.delete_pending?.length || 0) })
+            Requests ({editPending.length + deletePending.length})
           </TabsTrigger>
         </TabsList>
 
@@ -319,47 +323,92 @@ export default function ManageProperties() {
         {/* Edit/Delete Requests Tab */}
         <TabsContent value="requests" className="mt-8">
           {isLoadingRequests ? (
-            <div className="flex justify-center py-20"><Loader2 className="animate-spin text-amber-500" /></div>
+            <div className="flex justify-center py-20">
+              <Loader2 className="animate-spin text-amber-500" />
+            </div>
           ) : (
             <div className="space-y-8">
               {/* Edit Requests */}
-              {pendingRequests?.edit_pending?.length > 0 && (
+              {editPending.length > 0 && (
                 <div>
                   <h3 className="text-lg font-serif font-bold text-blue-400 mb-4 flex items-center gap-2">
-                    <Edit2 className="w-4 h-4" /> Edit Requests ({pendingRequests.edit_pending.length})
+                    <Edit2 className="w-4 h-4" />
+                    Edit Requests ({editPending.length})
                   </h3>
+
                   <div className="bg-white/[0.02] border border-white/5 rounded-[32px] overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-white/[0.02] border-b border-white/5">
                         <tr className="text-[10px] uppercase tracking-[0.3em] text-white/25 font-bold">
-                          <th className="px-8 py-5 text-left">Property</th>
-                          <th className="px-8 py-5 text-right">Actions</th>
-                         </tr>
+                          <th className="px-8 py-5 text-left">
+                            Property
+                          </th>
+                          <th className="px-8 py-5 text-right">
+                            Actions
+                          </th>
+                        </tr>
                       </thead>
+
                       <tbody>
-                        {pendingRequests.edit_pending.map((p: Property) => (
-                          <tr key={p.property_id} className="hover:bg-white/[0.01]">
+                        {editPending.map((p: Property) => (
+                          <tr
+                            key={p.property_id}
+                            className="hover:bg-white/[0.01]"
+                          >
                             <td className="px-8 py-6">
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-[#0D2137] border border-white/10 overflow-hidden">
-                                  <img src={p.media?.[0]?.url} alt={p.title} className="w-full h-full object-cover" />
+                                  <img
+                                    src={p.media?.[0]?.url}
+                                    alt={p.title}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
+
                                 <div>
-                                  <p className="text-sm font-semibold text-white">{p.title}</p>
-                                  <p className="text-[10px] text-white/30">{p.location?.city}</p>
+                                  <p className="text-sm font-semibold text-white">
+                                    {p.title}
+                                  </p>
+                                  <p className="text-[10px] text-white/30">
+                                    {p.location?.city}
+                                  </p>
                                 </div>
                               </div>
                             </td>
+
                             <td className="px-8 py-6 text-right">
                               <div className="flex justify-end gap-2">
-                                <Button onClick={() => setPreviewId(p.property_id)} variant="outline" className="h-9 px-4 bg-white/5 text-white/60 border-white/10 rounded-xl text-[10px]">
-                                  <Eye className="w-3.5 h-3.5 mr-1.5" />Review
+                                <Button
+                                  onClick={() => setPreviewId(p.property_id)}
+                                  variant="outline"
+                                  className="h-9 px-4 bg-white/5 text-white/60 border-white/10 rounded-xl text-[10px]"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                                  Review
                                 </Button>
-                                <Button onClick={() => approveEditMutation.mutate(p.property_id)} className="h-9 px-4 bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500 rounded-xl text-[10px]">
-                                  <Check className="w-3.5 h-3.5 mr-1.5" />Approve Edit
+
+                                <Button
+                                  onClick={() =>
+                                    approveEditMutation.mutate(
+                                      p.property_id
+                                    )
+                                  }
+                                  className="h-9 px-4 bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500 rounded-xl text-[10px]"
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                                  Approve Edit
                                 </Button>
-                                <Button onClick={() => rejectEditMutation.mutate(p.property_id)} className="h-9 px-4 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 rounded-xl text-[10px]">
-                                  <XCircle className="w-3.5 h-3.5 mr-1.5" />Reject
+
+                                <Button
+                                  onClick={() =>
+                                    rejectEditMutation.mutate(
+                                      p.property_id
+                                    )
+                                  }
+                                  className="h-9 px-4 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 rounded-xl text-[10px]"
+                                >
+                                  <XCircle className="w-3.5 h-3.5 mr-1.5" />
+                                  Reject
                                 </Button>
                               </div>
                             </td>
@@ -372,45 +421,93 @@ export default function ManageProperties() {
               )}
 
               {/* Delete Requests */}
-              {pendingRequests?.delete_pending?.length > 0 && (
+              {deletePending.length > 0 && (
                 <div>
                   <h3 className="text-lg font-serif font-bold text-orange-400 mb-4 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" /> Delete Requests ({pendingRequests.delete_pending.length})
+                    <AlertTriangle className="w-4 h-4" />
+                    Delete Requests ({deletePending.length})
                   </h3>
+
                   <div className="bg-white/[0.02] border border-white/5 rounded-[32px] overflow-hidden">
                     <table className="w-full">
                       <thead className="bg-white/[0.02] border-b border-white/5">
                         <tr className="text-[10px] uppercase tracking-[0.3em] text-white/25 font-bold">
-                          <th className="px-8 py-5 text-left">Property</th>
-                          <th className="px-8 py-5 text-left">Builder</th>
-                          <th className="px-8 py-5 text-right">Actions</th>
-                         </tr>
+                          <th className="px-8 py-5 text-left">
+                            Property
+                          </th>
+                          <th className="px-8 py-5 text-left">
+                            Builder
+                          </th>
+                          <th className="px-8 py-5 text-right">
+                            Actions
+                          </th>
+                        </tr>
                       </thead>
+
                       <tbody>
-                        {pendingRequests.delete_pending.map((p: Property) => (
-                          <tr key={p.property_id} className="hover:bg-white/[0.01]">
+                        {deletePending.map((p: Property) => (
+                          <tr
+                            key={p.property_id}
+                            className="hover:bg-white/[0.01]"
+                          >
                             <td className="px-8 py-6">
                               <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-xl bg-[#0D2137] border border-white/10 overflow-hidden">
-                                  <img src={p.media?.[0]?.url} alt={p.title} className="w-full h-full object-cover" />
+                                  <img
+                                    src={p.media?.[0]?.url}
+                                    alt={p.title}
+                                    className="w-full h-full object-cover"
+                                  />
                                 </div>
+
                                 <div>
-                                  <p className="text-sm font-semibold text-white">{p.title}</p>
-                                  <p className="text-[10px] text-white/30">{p.location?.city}</p>
+                                  <p className="text-sm font-semibold text-white">
+                                    {p.title}
+                                  </p>
+                                  <p className="text-[10px] text-white/30">
+                                    {p.location?.city}
+                                  </p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-8 py-6 text-white/60 text-sm">{p.builder?.name}</td>
+
+                            <td className="px-8 py-6 text-white/60 text-sm">
+                              {p.builder?.name}
+                            </td>
+
                             <td className="px-8 py-6 text-right">
                               <div className="flex justify-end gap-2">
-                                <Button onClick={() => setPreviewId(p.property_id)} variant="outline" className="h-9 px-4 bg-white/5 text-white/60 border-white/10 rounded-xl text-[10px]">
-                                  <Eye className="w-3.5 h-3.5 mr-1.5" />Review
+                                <Button
+                                  onClick={() => setPreviewId(p.property_id)}
+                                  variant="outline"
+                                  className="h-9 px-4 bg-white/5 text-white/60 border-white/10 rounded-xl text-[10px]"
+                                >
+                                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                                  Review
                                 </Button>
-                                <Button onClick={() => rejectDeleteMutation.mutate(p.property_id)} className="h-9 px-4 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500 rounded-xl text-[10px]">
-                                  <Check className="w-3.5 h-3.5 mr-1.5" />Keep Property
+
+                                <Button
+                                  onClick={() =>
+                                    rejectDeleteMutation.mutate(
+                                      p.property_id
+                                    )
+                                  }
+                                  className="h-9 px-4 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500 rounded-xl text-[10px]"
+                                >
+                                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                                  Keep Property
                                 </Button>
-                                <Button onClick={() => approveDeleteMutation.mutate(p.property_id)} className="h-9 px-4 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 rounded-xl text-[10px]">
-                                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete
+
+                                <Button
+                                  onClick={() =>
+                                    approveDeleteMutation.mutate(
+                                      p.property_id
+                                    )
+                                  }
+                                  className="h-9 px-4 bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500 rounded-xl text-[10px]"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                                  Delete
                                 </Button>
                               </div>
                             </td>
@@ -422,9 +519,12 @@ export default function ManageProperties() {
                 </div>
               )}
 
-              {(!pendingRequests?.edit_pending?.length && !pendingRequests?.delete_pending?.length) && (
-                <div className="text-center py-20 text-white/30">No pending edit or delete requests.</div>
-              )}
+              {editPending.length === 0 &&
+                deletePending.length === 0 && (
+                  <div className="text-center py-20 text-white/30">
+                    No pending edit or delete requests.
+                  </div>
+                )}
             </div>
           )}
         </TabsContent>
