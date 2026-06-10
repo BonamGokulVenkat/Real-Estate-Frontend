@@ -243,7 +243,7 @@ export default function EditProperty() {
         property_type: data.property_type.toLowerCase() as PropertyType,
         bedrooms: Number(data.bedrooms),
         bathrooms: Number(data.bathrooms),
-        size_sqft: data.size_sqft ? Number(data.size_sqft) : null,
+        size_sqft: data.size_sqft ? Number(data.size_sqft) : undefined,
         price: data.price,
         location: {
           address: data.address,
