@@ -48,7 +48,7 @@ export interface CreatePropertyPayload {
   property_type: PropertyType;
   bedrooms: number;
   bathrooms: number;
-  size_sqft: number;
+  size_sqft?: number;
   price: string;
   location: {
     address: string;

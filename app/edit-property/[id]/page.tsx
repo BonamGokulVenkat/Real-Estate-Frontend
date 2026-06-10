@@ -25,7 +25,7 @@ interface EditFormData {
   property_type: string;
   bedrooms: number;
   bathrooms: number;
-  size_sqft?: number;
+  size_sqft?: number | null;
   price: string;
   address: string;
   city: string;
@@ -104,7 +104,7 @@ export default function EditProperty() {
         property_type: property.property_type,
         bedrooms: property.bedrooms,
         bathrooms: property.bathrooms,
-        size_sqft: property.size_sqft ? Number(property.size_sqft) : null,
+        size_sqft: property.size_sqft ?? undefined,
         price: property.price,
         address: property.location?.address || "",
         city: property.location?.city || "",

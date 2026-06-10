@@ -214,7 +214,7 @@ export default function Sell() {
         listing_type: "sale",
         bedrooms: Number(data.bedrooms) || 0,
         bathrooms: Number(data.bathrooms) || 0,
-        size_sqft: data.size ? Number(data.size) : null,
+        size_sqft: data.size ? Number(data.size) : undefined,
         price: data.price,
         location: {
           address: data.address,
