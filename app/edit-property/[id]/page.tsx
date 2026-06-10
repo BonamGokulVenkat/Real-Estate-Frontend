@@ -104,7 +104,7 @@ export default function EditProperty() {
         property_type: property.property_type,
         bedrooms: property.bedrooms,
         bathrooms: property.bathrooms,
-        size_sqft: property.size_sqft,
+        size_sqft: property.size_sqft ? Number(property.size_sqft) : null,
         price: property.price,
         address: property.location?.address || "",
         city: property.location?.city || "",
