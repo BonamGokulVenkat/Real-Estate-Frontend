@@ -74,7 +74,7 @@ export default function Profile() {
   }, [isAuthenticated, router]);
 
   // ✅ Now we can have conditional returns AFTER all hooks
-  if (isAuthenticated) {
+  if (!isAuthenticated && !user) {
     return (
       <div className="min-h-screen pt-32 flex justify-center bg-[#0A192F]">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
