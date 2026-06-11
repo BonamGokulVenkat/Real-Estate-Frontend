@@ -47,11 +47,20 @@ export default function Signup({ params }: PageProps) {
       toast.success("Account created successfully!");
 
       // Store tokens
-      Cookies.set("access_token", data.access_token);
+      Cookies.set("access_token", data.access_token,{
+        secure: true,
+        sameSite: "None",
+        path: "/",
+      });
       if (data.refresh_token) {
-        Cookies.set("refresh_token", data.refresh_token);
+        Cookies.set("refresh_token", data.refresh_token,{
+          secure: true,
+          sameSite: "None",
+          path: "/",
+        });
       }
-
+      
+      router.refresh(); // Refresh to update auth state across the app
       // Map the backend user to UserProfile
       const profile = data.user as unknown as UserProfile;
       setUser(profile);
