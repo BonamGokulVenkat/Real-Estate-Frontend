@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function Profile() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
@@ -68,13 +68,14 @@ export default function Profile() {
 
   // ✅ useEffect is also a hook, must be called unconditionally
   useEffect(() => {
+    if (!isHydrated) return;
     if (!isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated,isHydrated, router]);
 
   // ✅ Now we can have conditional returns AFTER all hooks
-  if (!isAuthenticated && !user) {
+  if (!isHydrated || (!isAuthenticated && !user)) {
     return (
       <div className="min-h-screen pt-32 flex justify-center bg-[#0A192F]">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
