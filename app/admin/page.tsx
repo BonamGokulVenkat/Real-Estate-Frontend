@@ -9,29 +9,44 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+// ✅ Helper to format portfolio value
+const formatPortfolioValue = (value: number): string => {
+  if (value === 0) return "N/A";
+  
+  const inCrores = value / 10000000;
+  if (inCrores >= 1) {
+    return `₹${inCrores.toFixed(1)} Cr`;
+  }
+  
+  const inLakhs = value / 100000;
+  if (inLakhs >= 1) {
+    return `₹${inLakhs.toFixed(1)} L`;
+  }
+  
+  return `₹${value.toLocaleString()}`;
+};
+
 export default function AdminOverview() {
-  const { data: properties, isLoading: propsLoading } = useQuery({
-    queryKey: ["admin-properties"],
-    queryFn: () => propertyService.search({}),
+  // ✅ Fetch admin stats from backend
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: () => propertyService.getAdminStats(),
   });
 
+  // ✅ Fetch users for the table
   const { data: users, isLoading: usersLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: userService.getAll,
   });
 
-  const isLoading = propsLoading || usersLoading;
-
-  const allProps = properties || [];
+  const isLoading = statsLoading || usersLoading;
   const allUsers = users || [];
-  const builders = allUsers.filter((u: any) => u.role === "builder").length;
-  const portfolioValue = allProps.reduce((acc: number, p: any) => acc + Number(p.price || 0), 0);
 
-  const stats = [
+  const statsData = [
     {
       label: "Total Users",
-      val: isLoading ? "—" : allUsers.length,
-      sub: isLoading ? "Loading…" : `${builders} builders registered`,
+      val: isLoading ? "—" : stats?.totalUsers || 0,
+      sub: isLoading ? "Loading…" : `${stats?.totalBuilders || 0} builders registered`,
       icon: Users,
       color: "text-amber-500",
       glow: "bg-amber-500/5",
@@ -39,7 +54,7 @@ export default function AdminOverview() {
     },
     {
       label: "Active Listings",
-      val: isLoading ? "—" : allProps.length,
+      val: isLoading ? "—" : stats?.totalProperties || 0,
       sub: "Live on marketplace",
       icon: Building,
       color: "text-blue-400",
@@ -48,10 +63,10 @@ export default function AdminOverview() {
     },
     {
       label: "Portfolio Value",
-      val: isLoading
-        ? "—"
-        : allProps.length
-        ? `₹${(portfolioValue / 10000000).toFixed(1)} Cr`
+      val: isLoading 
+        ? "—" 
+        : stats?.totalProperties > 0 
+        ? formatPortfolioValue(stats?.portfolioValue || 0)
         : "N/A",
       sub: "Total asset valuation",
       icon: FileText,
@@ -82,7 +97,7 @@ export default function AdminOverview() {
 
       {/* ── KPI Grid ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {stats.map((stat, i) => (
+        {statsData.map((stat, i) => (
           <Link key={i} href={stat.href}>
             <div className={cn(
               "group relative rounded-[28px] border border-white/[0.07] p-7 transition-all duration-500",
