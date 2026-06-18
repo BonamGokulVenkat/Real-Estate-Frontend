@@ -32,6 +32,7 @@ import {
 export default function Profile() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
   const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
@@ -366,62 +367,91 @@ export default function Profile() {
               </div>
             ) : listed.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {listed.map((p: Property, i: number) => {
-                  const statusBadge = getStatusBadge(p.status, p.pending_action);
-                  const StatusIcon = statusBadge.icon;
-                  
-                  return (
-                    <div key={p.property_id} className="relative group">
-                      <PropertyCard property={p} index={i} />
-                      
-                      <div className="absolute top-4 left-4 z-20">
-                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}>
-                          <StatusIcon className="w-3 h-3" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">{statusBadge.text}</span>
-                        </div>
-                      </div>
-                      
-                      {p.status === "available" && (
-                        <div className="absolute bottom-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link href={`/edit-property/${p.property_id}`}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3 bg-white/10 border-white/20 text-white text-[10px] font-bold rounded-lg hover:bg-amber-500 hover:border-amber-500"
+              {listed.map((p: Property, i: number) => {
+              const statusBadge = getStatusBadge(p.status, p.pending_action);
+              const StatusIcon = statusBadge.icon;
+              const isMenuOpen = openMenuId === p.property_id;
+
+              return (
+                <div key={p.property_id} className="relative group">
+                  <PropertyCard property={p} index={i} />
+
+                  {/* Status badge */}
+                  <div className="absolute bottom-50 right-4 z-20">
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}>
+                      <StatusIcon className="w-3 h-3" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider">{statusBadge.text}</span>
+                    </div>
+                  </div>
+
+                  {/* Three-dot menu — only for available properties */}
+                  {p.status === "available" && (
+                    <div className="absolute top-4 right-75 z-30">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenMenuId(isMenuOpen ? null : p.property_id);
+                        }}
+                        className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-white/40 transition-all"
+                      >
+                        <span className="flex flex-col gap-[3px] items-center justify-center">
+                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                        </span>
+                      </button>
+
+                      {isMenuOpen && (
+                        <>
+                          {/* Backdrop to close menu */}
+                          <div
+                            className="fixed inset-0 z-20"
+                            onClick={() => setOpenMenuId(null)}
+                          />
+                          <div className="absolute top-10 right-0 z-30 bg-[#0D2137] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                            <Link
+                              href={`/edit-property/${p.property_id}`}
+                              className="flex items-center gap-2.5 px-4 py-3 text-white/70 hover:bg-white/5 hover:text-amber-400 transition-colors text-xs font-semibold"
+                              onClick={() => setOpenMenuId(null)}
                             >
-                              <Edit className="w-3 h-3 mr-1" />
+                              <Edit className="w-3.5 h-3.5" />
                               Edit
-                            </Button>
-                          </Link>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setPropertyToDelete(p)}
-                            className="h-8 px-3 bg-red-500/10 border-red-500/20 text-red-400 text-[10px] font-bold rounded-lg hover:bg-red-500 hover:text-white"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {p.status === "edit_pending" && (
-                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-blue-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                          <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">
-                            Awaiting admin approval for edits
-                          </p>
-                        </div>
-                      )}
-                      
-                      {p.status === "delete_pending" && (
-                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-orange-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                          <p className="text-orange-400 text-[9px] font-bold uppercase tracking-wider">
-                            Deletion request pending admin approval
-                          </p>
-                        </div>
+                            </Link>
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                setPropertyToDelete(p);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-xs font-semibold border-t border-white/5"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
-                  );
-                })}
+                  )}
+
+                  {p.status === "edit_pending" && (
+                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-blue-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                      <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">
+                        Awaiting admin approval for edits
+                      </p>
+                    </div>
+                  )}
+
+                  {p.status === "delete_pending" && (
+                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-orange-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                      <p className="text-orange-400 text-[9px] font-bold uppercase tracking-wider">
+                        Deletion request pending admin approval
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
               </div>
             ) : (
               <div className="py-24 text-center bg-white/[0.01] rounded-[40px] border border-dashed border-white/10">

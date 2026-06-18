@@ -33,6 +33,9 @@ export default function JustForYou() {
   const [typeFilter, setTypeFilter] = useState<string>(
     searchParams.get("type") || "all"
   );
+  const [countryFilter, setCountryFilter] = useState<string>(
+    searchParams.get("country") || "all"
+  );
   const [cityFilter, setCityFilter] = useState<string>(
     searchParams.get("city") || "all"
   );
@@ -45,8 +48,10 @@ export default function JustForYou() {
   // ── Sync URL params → state when URL changes (e.g. browser back/forward) ──
   useEffect(() => {
     const type = searchParams.get("type");
+    const country = searchParams.get("country");
     const city = searchParams.get("city");
     if (type) setTypeFilter(type);
+    if (country) setCountryFilter(country);
     if (city) setCityFilter(city);
   }, [searchParams]);
 
@@ -55,10 +60,11 @@ export default function JustForYou() {
     const params = new URLSearchParams();
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (cityFilter !== "all") params.set("city", cityFilter);
+    if (countryFilter !== "all") params.set("country", countryFilter);
     if (maxPrice[0] < 100000000) params.set("max_price", maxPrice[0].toString());
     if (minBeds > 0) params.set("bedrooms", minBeds.toString());
     router.replace(`?${params.toString()}`, { scroll: false });
-  }, [typeFilter, cityFilter, maxPrice, minBeds]);
+  }, [typeFilter, cityFilter, countryFilter, maxPrice, minBeds]);
 
   // ── Fetch available cities from DB ─────────────────────────────────────────
   const { data: availableCities = [], isLoading: citiesLoading } = useQuery<string[]>({
@@ -67,13 +73,21 @@ export default function JustForYou() {
     staleTime: 5 * 60 * 1000,
   });
 
+  // ── Fetch available countries from DB ───────────────────────────────────────
+  const { data: availableCountries = [], isLoading: countriesLoading } = useQuery<string[]>({
+    queryKey: ["property-countries"],
+    queryFn: () => propertyService.getCountries(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   // ── Fetch filtered properties ───────────────────────────────────────────────
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ["properties", typeFilter, cityFilter, maxPrice[0], minBeds, sortBy],
+    queryKey: ["properties", typeFilter, cityFilter, countryFilter, maxPrice[0], minBeds, sortBy],
     queryFn: async () => {
       const params: any = {};
       if (typeFilter !== "all") params.property_type = typeFilter;
       if (cityFilter !== "all") params.city = cityFilter;
+      if (countryFilter !== "all") params.country = countryFilter;
       if (maxPrice[0] < 100000000) params.max_price = maxPrice[0];
       if (minBeds > 0) params.bedrooms = minBeds;
       console.log("SEARCH PARAMS:", params);
@@ -98,6 +112,7 @@ export default function JustForYou() {
     setMinBeds(0);
     setTypeFilter("all");
     setCityFilter("all");
+    setCountryFilter("all");
   };
   return (
 
@@ -151,8 +166,57 @@ export default function JustForYou() {
 
           {/* Divider */}
           <div className="h-[1px] bg-white/5 w-full" />
+          {/*Row 2 - country filter */}  
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 mr-1">
+              <MapPin className="w-3 h-3 text-amber-500/60" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/30">
+                Country
+              </span>
+            </div>
+            {/* All Countries pill */}
+            <Button
+              variant={countryFilter === "all" ? "default" : "ghost"}
+              onClick={() => setCountryFilter("all")}
+              className={`rounded-xl text-[10px] font-bold uppercase tracking-widest h-8 px-4 transition-all ${
+                countryFilter === "all"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"
+                  : "text-white/30 hover:text-white/70 hover:bg-white/5"
+              }`}
+            >
+              All Countries
+            </Button>
 
-          {/* Row 2 — City filter */}
+            {/* Skeleton pills while loading */}
+            {countriesLoading &&
+              [1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  className="h-8 w-20 rounded-xl bg-white/5 animate-pulse"
+                />
+              ))}
+
+            {/* Dynamic country pills from DB */}
+            {!countriesLoading &&
+              availableCountries.map((country) => (
+                <Button
+                  key={country}
+                  variant={countryFilter === country ? "default" : "ghost"}
+                  onClick={() => setCountryFilter(country)}
+                  className={`rounded-xl text-[10px] font-bold uppercase tracking-widest h-8 px-4 transition-all ${
+                    countryFilter === country
+                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"
+                      : "text-white/30 hover:text-white/70 hover:bg-white/5"
+                  }`}
+                >
+                  {country}
+                </Button>
+              ))}
+          </div>
+
+          {/* Divider */}
+          <div className="h-[1px] bg-white/5 w-full" />
+          {/* Row 3 — City filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 mr-1">
               <MapPin className="w-3 h-3 text-amber-500/60" />

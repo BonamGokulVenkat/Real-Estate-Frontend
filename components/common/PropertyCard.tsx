@@ -92,7 +92,7 @@ export default function PropertyCard({ property, index }: { property: Property; 
           <div className="relative aspect-[16/11] overflow-hidden shrink-0">
             <Image 
               src={imageUrl} 
-              alt={property.title} 
+              alt={property.title || "Property Image"}
               fill 
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
               className="object-cover transition-transform duration-1000 group-hover:scale-110" 

@@ -52,13 +52,14 @@ export default async function Page({
   let property = null;
 
   try {
-    const res = await fetch(`${apiUrl}/properties/${id}`, {
-      cache: "no-store",
-    });
-    property = await res.json();
-  } catch (e) {
-    console.error("FETCH ERROR:", e);
-  }
+      const res = await fetch(`${apiUrl}/properties/${id}`, { cache: "no-store" });
+      const data = await res.json();
+      if (res.ok && data?.property_id) {
+        property = data;
+      }
+    } catch (e) {
+      console.error("FETCH ERROR:", e);
+    }
 
   return <PropertyClient id={id} initialData={property} />;
 }

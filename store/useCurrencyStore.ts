@@ -10,16 +10,21 @@ interface CurrencyState {
   setRates: (rates: Record<string, number>) => void;
 }
 
+const DEFAULT_RATES = { INR: 1, USD: 0.012, EUR: 0.011, GBP: 0.0094, AED: 0.044 };
+
 export const useCurrencyStore = create<CurrencyState>()(
   persist(
     (set) => ({
       currency: 'INR',
-      rates: { INR: 1 }, // Default, will be updated by hook
+      rates: DEFAULT_RATES,
       setCurrency: (currency) => set({ currency }),
       setRates: (rates) => set({ rates }),
     }),
     {
       name: 'currency-storage',
+      // Only persist the selected currency, not the rates
+      // Rates are always freshly fetched on load via useCurrency hook
+      partialize: (state) => ({ currency: state.currency }),
     }
   )
 );

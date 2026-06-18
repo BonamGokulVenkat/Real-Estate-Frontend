@@ -43,12 +43,6 @@ const SUGGESTIONS = [
   "Family home with garden",
 ];
 
-const HISTORY = [
-  "2 BHK in Bangalore",
-  "Luxury villas Mumbai",
-  "Student rental Pune",
-  "Family homes Delhi",
-];
 
 // ─── Keyframe injection ───────────────────────────────────────────────────────
 
@@ -822,6 +816,108 @@ function TypingIndicator() {
   );
 }
 
+function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }) {
+  const T_amber = "#D97706";
+ 
+  const renderInline = (line: string, key: number) => {
+    // Split on **bold** and *italic* markers
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return (
+      <span key={key}>
+        {parts.map((part, i) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return <strong key={i} style={{ color: "#fbbf24", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith("*") && part.endsWith("*")) {
+            return <em key={i}>{part.slice(1, -1)}</em>;
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  };
+ 
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+ 
+  while (i < lines.length) {
+    const line = lines[i];
+ 
+    // Numbered list item: "1. something"
+    const listMatch = line.match(/^(\d+)\.\s+(.+)/);
+    if (listMatch) {
+      const num = listMatch[1];
+      const content = listMatch[2];
+      elements.push(
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "flex-start",
+            margin: "6px 0",
+            padding: "8px 10px",
+            background: "rgba(217,119,6,0.06)",
+            borderLeft: `2px solid rgba(217,119,6,0.4)`,
+            borderRadius: "0 6px 6px 0",
+          }}
+        >
+          <span style={{
+            color: T_amber,
+            fontWeight: 700,
+            fontSize: "12px",
+            minWidth: "16px",
+            flexShrink: 0,
+            marginTop: "1px",
+          }}>
+            {num}.
+          </span>
+          <span>{renderInline(content, 0)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+ 
+    // Empty line → small spacer
+    if (line.trim() === "") {
+      elements.push(<div key={i} style={{ height: "6px" }} />);
+      i++;
+      continue;
+    }
+ 
+    // Plain paragraph
+    elements.push(
+      <p key={i} style={{ margin: "2px 0", lineHeight: 1.65 }}>
+        {renderInline(line, i)}
+      </p>
+    );
+    i++;
+  }
+ 
+  return (
+    <span>
+      {elements}
+      {streaming && (
+        <span
+          style={{
+            display: "inline-block",
+            width: "2px",
+            height: "13px",
+            background: T_amber,
+            marginLeft: "2px",
+            verticalAlign: "text-bottom",
+            animation: "curBlink 0.8s step-end infinite",
+          }}
+          aria-hidden
+        />
+      )}
+    </span>
+  );
+}
+
+
 function BubbleAI({ msg }: { msg: Message }) {
   return (
     <div style={css.msgRowAi}>
@@ -840,25 +936,12 @@ function BubbleAI({ msg }: { msg: Message }) {
         <span>Luxora AI</span>
       </div>
       <div style={css.bubbleAi}>
-        {msg.content}
-        {msg.streaming && (
-          <span
-            style={{
-              display: "inline-block",
-              width: "2px",
-              height: "13px",
-              background: T.amber,
-              marginLeft: "2px",
-              verticalAlign: "text-bottom",
-              animation: "curBlink 0.8s step-end infinite",
-            }}
-            aria-hidden
-          />
-        )}
+        <MarkdownText text={msg.content} streaming={msg.streaming} />
       </div>
     </div>
   );
 }
+ 
 
 function BubbleUser({ msg }: { msg: Message }) {
   return (
@@ -870,55 +953,7 @@ function BubbleUser({ msg }: { msg: Message }) {
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-function Sidebar({
-  onNewChat,
-  activeIdx,
-  setActiveIdx,
-}: {
-  onNewChat: () => void;
-  activeIdx: number;
-  setActiveIdx: (i: number) => void;
-}) {
-  return (
-    <div style={css.sidebar}>
-      <div style={css.sidebarLogo}>
-        <div style={css.logoIcon}>🏠</div>
-        <div style={css.logoTextWrap}>
-          <span style={css.logoName}>Luxora</span>
-          <span style={css.logoSub}>AI</span>
-        </div>
-      </div>
 
-      <button style={css.newChatBtn} onClick={onNewChat}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-        </svg>
-        New search
-      </button>
-
-      <div style={css.sidebarSection}>Recent</div>
-      {HISTORY.map((h, i) => (
-        <div
-          key={h}
-          style={i === activeIdx ? css.historyItemActive : css.historyItem}
-          onClick={() => setActiveIdx(i)}
-        >
-          {i === activeIdx
-            ? <><span style={css.activeDot} />{h}</>
-            : <>{h}</>}
-        </div>
-      ))}
-
-      <div style={{ flex: 1 }} />
-
-      <div style={css.ragFooter}>
-        <div style={css.ragFooterDot} />
-        RAG · Vector Search Active
-      </div>
-    </div>
-  );
-}
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
@@ -1084,11 +1119,7 @@ export default function PropertyChatWidget() {
     <div style={css.host}>
       <ParticleLayer />
 
-      <Sidebar
-        onNewChat={handleNewChat}
-        activeIdx={activeHistory}
-        setActiveIdx={setActiveHistory}
-      />
+      
 
       <div style={css.main}>
         {/* Topbar */}
@@ -1123,13 +1154,7 @@ export default function PropertyChatWidget() {
           </button>
         </div>
 
-        {/* RAG strip */}
-        <div style={css.ragStrip}>
-          <div style={css.ragDot} />
-          <span style={css.ragText}>
-            Semantic vector search · Retrieval-augmented generation · Session memory
-          </span>
-        </div>
+        
 
         {/* Messages */}
         <div

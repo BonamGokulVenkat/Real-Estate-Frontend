@@ -38,7 +38,13 @@ export default function Sell() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { formatPrice, currency, setCurrency } = useCurrency();
+  const { formatPrice, currency, setCurrency, rates } = useCurrency();
+
+  const convertToINR = (amount: number): number => {
+  const rate = rates[currency] ?? 1;
+  if (!rate || rate === 0) return amount;
+  return Number((amount / rate).toFixed(2));
+};
   
   // State for upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -206,6 +212,10 @@ export default function Sell() {
       setUploadProgress(75);
       toast.loading("Publishing property details...", { id: toastId });
 
+      const priceInSelectedCurrency = Number(data.price);
+      const priceInINR = !isNaN(priceInSelectedCurrency) && isFinite(priceInSelectedCurrency)
+      ? convertToINR(priceInSelectedCurrency): data.price;
+
       // ✅ CORRECTED PAYLOAD STRUCTURE
       const payload = {
         title: data.title,
@@ -215,7 +225,7 @@ export default function Sell() {
         bedrooms: Number(data.bedrooms) || 0,
         bathrooms: Number(data.bathrooms) || 0,
         size_sqft: data.size ? Number(data.size) : undefined,
-        price: data.price,
+        price: String(priceInINR),
         location: {
           address: data.address,
           city: data.city,
@@ -356,11 +366,11 @@ export default function Sell() {
                         onChange={(e) => setCurrency(e.target.value as any)}
                         className={`${inputStyle} w-full px-3 appearance-none`}
                       >
-                        <option value="INR">₹ INR</option>
-                        <option value="USD">$ USD</option>
-                        <option value="EUR">€ EUR</option>
-                        <option value="GBP">£ GBP</option>
-                        <option value="AED">AED</option>
+                        <option value="INR" className="bg-[#0D2137]">₹ INR</option>
+                        <option value="USD" className="bg-[#0D2137]">$ USD</option>
+                        <option value="EUR" className="bg-[#0D2137]">€ EUR</option>
+                        <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
+                        <option value="AED" className="bg-[#0D2137]">AED</option>
                       </select>
                     </div>
                     <div className="col-span-3">
@@ -374,7 +384,7 @@ export default function Sell() {
                   </div>
                   {isNumericPrice && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      Estimated: {formatPrice(numericPrice)}
+                      ≈ {formatPrice(convertToINR(numericPrice))} · value in INR: ₹{Math.round(convertToINR(numericPrice)).toLocaleString('en-IN')}
                     </p>
                   )}
                 </div>

@@ -70,6 +70,11 @@ export const propertyService = {
     return Array.isArray(res.data) ? res.data : [];
   },
 
+  getCountries: async (): Promise<string[]> => {
+    const res = await apiClient.get<string[]>(`/properties/countries`);
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
   getStats: async (): Promise<{ totalProperties: number; totalBuilders: number; totalCities: number }> => {
     const res = await apiClient.get('/properties/stats');
     return res.data;

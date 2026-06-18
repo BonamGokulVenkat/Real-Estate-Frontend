@@ -126,6 +126,19 @@ export default function PropertyClient({
     return <div className="text-white text-center mt-20">Not Found</div>;
   }
 
+  if (["pending", "edit_pending", "delete_pending", "rejected"].includes(property.status)) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A192F] text-white gap-4">
+      <div className="text-6xl">🕐</div>
+      <h2 className="font-serif text-3xl font-bold">Awaiting Approval</h2>
+      <p className="text-white/40 text-sm">This property is currently under review and not publicly accessible.</p>
+      <Link href="/profile" className="mt-4 text-amber-500 text-xs font-bold uppercase tracking-widest hover:underline">
+        ← Back to Profile
+      </Link>
+    </div>
+  );
+}
+
   // Separate all media into a unified list with type info
   const mediaItems: { url: string; type: "image" | "video" }[] =
     property.media && property.media.length > 0
@@ -143,10 +156,10 @@ export default function PropertyClient({
     (p) => p.property_id !== property.property_id
   );
   const agency = property.builder ? {
-    id: property.builder.user_id,
-    name: property.builder.name,
-    rating: 4.9,
-  } : null;
+      id: property.builder.user_id,
+      name: property.builder.name || "Unknown",
+      rating: 4.9,
+    } : null;
  
     return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
@@ -239,7 +252,7 @@ export default function PropertyClient({
                         </div>
                       </>
                     ) : (
-                      <Image src={item.url} alt="" fill className="object-cover" />
+                      <Image src={item.url} alt={`${property.title} - photo ${i + 1}`} fill className="object-cover" />
                     )}
                   </button>
                 ))}
@@ -253,7 +266,8 @@ export default function PropertyClient({
               </div>
               <h1 className="text-5xl md:text-7xl font-serif font-bold tracking-tighter leading-none">{property.title}</h1>
               <p className="flex items-center gap-2 text-white/40 text-lg font-light italic font-serif">
-                <MapPin className="w-5 h-5 text-amber-500" /> {property.location?.city}, {property.location?.state}
+                <MapPin className="w-5 h-5 text-amber-500" />
+                {[property.location?.city, property.location?.state].filter(Boolean).join(", ") || "Location not disclosed"}
               </p>
             </section>
 
@@ -264,9 +278,9 @@ export default function PropertyClient({
               <div className="space-y-6 text-white/50 text-lg font-light leading-relaxed">
                 <p>{property.description}</p>
                 <p>
-                  Listed in <span className="text-white font-medium">{new Date(property.date_added).getFullYear()}</span>, this 
-                  <span className="text-white font-medium"> {property.size_sqft} sqft</span> sanctuary represents the peak of 
-                  modern {property.property_type} architecture in {property.location?.city}.
+                  Listed in <span className="text-white font-medium">{property.date_added ? new Date(property.date_added).getFullYear() : "—"}</span>, this{" "}
+                  <span className="text-white font-medium">{property.size_sqft ?? "—"} sqft</span> sanctuary represents the peak of
+                  modern {property.property_type} architecture in {property.location?.city ?? "this area"}.
                 </p>
               </div>
             </section>
@@ -278,7 +292,7 @@ export default function PropertyClient({
                 {[
                   { label: "Architecture", value: property.property_type },
                   { label: "Status", value: property.status },
-                  { label: "Listed", value: new Date(property.date_added).getFullYear().toString() },
+                  { label: "Listed", value: property.date_added ? new Date(property.date_added).getFullYear().toString() : "—" },
                   { label: "Configuration", value: `${property.bedrooms} Bedrooms` },
                   { label: "Land Area", value: property.size_sqft && property.size_sqft > 0 ? `${property.size_sqft} Sq.Ft` : `Not Disclosed` },
                   { label: "Reference", value: `LX-${property.property_id.slice(0, 8).toUpperCase()}` }

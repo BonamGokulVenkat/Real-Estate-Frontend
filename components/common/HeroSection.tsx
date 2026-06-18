@@ -33,12 +33,20 @@ export default function HeroSection() {
 
   // Pre-fill from URL params if coming back from search
   const [location, setLocation] = useState<string>(searchParams.get("city") || "");
+  const [country, setCountry] = useState<string>(searchParams.get("country") || "");
   const [propertyType, setPropertyType] = useState<string>(searchParams.get("type") || "");
 
   // ── Live cities from DB ─────────────────────────────────────────────────────
   const { data: cities = [] } = useQuery<string[]>({
     queryKey: ["property-cities"],
     queryFn: propertyService.getCities,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Live countries from DB ──────────────────────────────────────────────────
+  const { data: countries = [] } = useQuery<string[]>({
+    queryKey: ["property-countries"],
+    queryFn: propertyService.getCountries,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -80,6 +88,7 @@ export default function HeroSection() {
   // ── Search handler ──────────────────────────────────────────────────────────
   const handleSearch = () => {
     const query = new URLSearchParams();
+    if (country) query.set("country", country);
     if (location) query.set("city", location);
     if (propertyType) query.set("type", propertyType);
     router.push(`/just-for-you${query.toString() ? `?${query.toString()}` : ""}`);
@@ -156,6 +165,23 @@ export default function HeroSection() {
             <div className="relative bg-[#0A192F]/60 backdrop-blur-3xl border border-white/10 rounded-2xl p-2 shadow-2xl">
               <div className="flex flex-col md:flex-row items-stretch gap-2">
 
+                {/* Country Selector */}
+                <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/5 rounded-xl focus-within:border-amber-500/50 transition-all">
+                  <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
+                  <Select value={country} onValueChange={setCountry}>
+                    <SelectTrigger className="border-0 bg-transparent text-white focus:ring-0 shadow-none h-10 px-0 font-light">
+                      <SelectValue placeholder="Select Country" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0D2137] border-white/10 text-white">
+                      {countries.map((country) => (
+                        <SelectItem key={country} value={country} className="focus:bg-amber-500/20 focus:text-amber-400">
+                          {country}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                  <Separator orientation="vertical" className="hidden md:block bg-white/10 h-10 self-center" />
                 {/* City Selector */}
                 <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/5 rounded-xl focus-within:border-amber-500/50 transition-all">
                   <MapPin className="w-4 h-4 text-amber-500 shrink-0" />

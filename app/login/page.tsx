@@ -58,7 +58,7 @@ export default function Login() {
       }
 
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Authentication failed. Please try again.");
+      toast.error("Invalid email or password. Please try again.");
     } finally {
       setIsLoading(false);
     }
