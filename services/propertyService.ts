@@ -169,4 +169,17 @@ export const propertyService = {
   directDelete: async (id: string): Promise<void> => {
     await apiClient.delete(`/properties/admin/direct-delete/${id}`);
   },
+
+  // In propertyService.ts - add this method
+
+  getAdminStats: async (): Promise<{
+    totalUsers: number;
+    totalBuilders: number;
+    totalProperties: number;
+    portfolioValue: number;
+    monthlyStats?: Array<{ month: string; count: number }>;
+  }> => {
+    const res = await apiClient.get('/properties/admin/stats');
+    return res.data;
+  }
 };
