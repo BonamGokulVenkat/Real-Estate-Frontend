@@ -65,7 +65,7 @@ export default function AdminOverview() {
       label: "Portfolio Value",
       val: isLoading 
         ? "—" 
-        : stats?.totalProperties > 0 
+        : (stats?.totalProperties ?? 0) > 0 
         ? formatPortfolioValue(stats?.portfolioValue || 0)
         : "N/A",
       sub: "Total asset valuation",
