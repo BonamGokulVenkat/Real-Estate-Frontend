@@ -38,8 +38,8 @@ export default function HeroSection() {
 
   // ── Live cities from DB ─────────────────────────────────────────────────────
   const { data: cities = [] } = useQuery<string[]>({
-    queryKey: ["property-cities"],
-    queryFn: propertyService.getCities,
+    queryKey: ["property-cities", country],
+    queryFn: () => propertyService.getCities(country || undefined),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -93,6 +93,11 @@ export default function HeroSection() {
     if (propertyType) query.set("type", propertyType);
     router.push(`/just-for-you${query.toString() ? `?${query.toString()}` : ""}`);
   };
+
+  const handleCountryChange = (value: string) => {
+  setCountry(value);
+  setLocation("");   // ← clear stale city when country switches
+};
 
   return (
     <section
@@ -168,7 +173,7 @@ export default function HeroSection() {
                 {/* Country Selector */}
                 <div className="flex-1 flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/5 rounded-xl focus-within:border-amber-500/50 transition-all">
                   <MapPin className="w-4 h-4 text-amber-500 shrink-0" />
-                  <Select value={country} onValueChange={setCountry}>
+                  <Select value={country} onValueChange={handleCountryChange}>
                     <SelectTrigger className="border-0 bg-transparent text-white focus:ring-0 shadow-none h-10 px-0 font-light">
                       <SelectValue placeholder="Select Country" />
                     </SelectTrigger>

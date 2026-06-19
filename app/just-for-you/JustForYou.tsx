@@ -68,8 +68,8 @@ export default function JustForYou() {
 
   // ── Fetch available cities from DB ─────────────────────────────────────────
   const { data: availableCities = [], isLoading: citiesLoading } = useQuery<string[]>({
-    queryKey: ["property-cities"],
-    queryFn: () => propertyService.getCities(),
+    queryKey: ["property-cities", countryFilter],
+    queryFn: () => propertyService.getCities(countryFilter !== "all" ? countryFilter : undefined),
     staleTime: 5 * 60 * 1000,
   });
 
@@ -107,6 +107,10 @@ export default function JustForYou() {
 
   const filtered = properties || [];
 
+  const handleCountryChange = (country: string) => {
+    setCountryFilter(country);
+    setCityFilter("all");  // ← clear stale city when country switches
+  };
   const handleReset = () => {
     setMaxPrice([100000000]);
     setMinBeds(0);
@@ -177,7 +181,7 @@ export default function JustForYou() {
             {/* All Countries pill */}
             <Button
               variant={countryFilter === "all" ? "default" : "ghost"}
-              onClick={() => setCountryFilter("all")}
+              onClick={() => handleCountryChange("all")}
               className={`rounded-xl text-[10px] font-bold uppercase tracking-widest h-8 px-4 transition-all ${
                 countryFilter === "all"
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"
@@ -202,7 +206,7 @@ export default function JustForYou() {
                 <Button
                   key={country}
                   variant={countryFilter === country ? "default" : "ghost"}
-                  onClick={() => setCountryFilter(country)}
+                  onClick={() => handleCountryChange(country)}
                   className={`rounded-xl text-[10px] font-bold uppercase tracking-widest h-8 px-4 transition-all ${
                     countryFilter === country
                       ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30"

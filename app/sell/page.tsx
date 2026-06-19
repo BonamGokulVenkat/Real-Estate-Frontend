@@ -4,12 +4,13 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { Upload, Home, Sparkles, Bed, Bath, Ruler, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import Require from "@/components/common/required";
+import { Input } from "@/components/ui/input";  
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { propertyService, PropertyStatus, PropertyType } from "@/services/propertyService";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";      
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
@@ -27,7 +28,8 @@ interface SellForm {
   price: string;
   address: string;
   city: string;
-  state: string;
+  state?: string;
+  country:string;
   zipCode: string;
   features: string[]
 }
@@ -48,20 +50,21 @@ export default function Sell() {
   
   // State for upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
-
+  
   const geocodeAddress = async (
     address: string,
     city: string,
     state: string,
+    country:string,
     zipCode: string
   ) => {
     const queries = [
-      `${address}, ${city}, ${state}, ${zipCode}`,
-      `${address}, ${city}, ${state}`,
+      `${address}, ${city}, ${state}, ${country}, ${zipCode}`,
+      `${address}, ${city}, ${state}, ${country}`,
       `${address}, ${city}`,
       `${city}, ${state}, ${zipCode}`,
       `${city}, ${state}`,
-      state,
+      country ? `${city}, ${country}` : `${city}`,
     ];
 
     for (const query of queries) {
@@ -202,7 +205,7 @@ export default function Sell() {
       }
 
       // Get coordinates
-      const coordinates = await geocodeAddress(data.address, data.city, data.state, data.zipCode);
+      const coordinates = await geocodeAddress(data.address, data.city, data.state || "", data.country, data.zipCode);
       if (!coordinates) {
         toast.error("Unable to locate property. Please verify the address.", { id: toastId });
         setIsSubmitting(false);
@@ -229,7 +232,8 @@ export default function Sell() {
         location: {
           address: data.address,
           city: data.city,
-          state: data.state,
+          state: data.state || "",
+          country: data.country,
           zipCode: Number(data.zipCode) || 0,
           lat: coordinates.lat,
           lng: coordinates.lng,
@@ -322,7 +326,9 @@ export default function Sell() {
             </h2>
             <div className="space-y-8">
               <div className="space-y-1">
-                <label className={labelStyle}>Listing Title</label>
+                <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Listing Title</label> <Require />
+                </div>
                 <Input 
                   {...register("title", { required: "Title is required" })} 
                   className={`${inputStyle} ${errors.title ? "border-red-500/50" : ""}`} 
@@ -332,7 +338,9 @@ export default function Sell() {
               </div>
 
               <div className="space-y-1">
-                <label className={labelStyle}>Description</label>
+                <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Description</label> <Require />
+                </div>
                 <textarea 
                   {...register("description", { required: "Description is required" })} 
                   className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${errors.description ? "border-red-500/50" : ""}`} 
@@ -343,7 +351,9 @@ export default function Sell() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Property Type</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Property Type</label> <Require />
+                </div>
                   <select {...register("type", { required: "Property type is required" })} className={`${inputStyle} w-full px-3 appearance-none`}>
                     <option value="">Select Type</option>
                     <option value="villa" className="bg-[#0D2137]">Villa</option>
@@ -358,7 +368,9 @@ export default function Sell() {
                   {errors.type && <p className="text-red-400 text-[10px] mt-1">{errors.type.message}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className={labelStyle}>Asking Price</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Asking Price</label> <Require />
+                </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
                     <div className="space-y-2 w-18">
                       <select
@@ -372,6 +384,7 @@ export default function Sell() {
                         <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
                         <option value="AED" className="bg-[#0D2137]">AED</option>
                       </select>
+                      {errors.price && <p className="text-red-400 text-[10px] mt-1">{errors.price.message}</p>}
                     </div>
                     <div className="col-span-3">
                       <Input 
@@ -392,7 +405,9 @@ export default function Sell() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Bedrooms</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Bedrooms</label> <Require />
+                </div>
                   <div className="relative">
                     <Bed className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                     <Input 
@@ -401,10 +416,13 @@ export default function Sell() {
                       className={`${inputStyle} pl-12`} 
                       placeholder="4" 
                     />
+                    {errors.bedrooms && <p className="text-red-400 text-[10px] mt-1">{errors.bedrooms.message}</p>}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className={labelStyle}>Bathrooms</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Bathrooms</label> <Require />
+                </div>
                   <div className="relative">
                     <Bath className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                     <Input 
@@ -413,6 +431,7 @@ export default function Sell() {
                       className={`${inputStyle} pl-12`} 
                       placeholder="5" 
                     />
+                    {errors.bathrooms && <p className="text-red-400 text-[10px] mt-1">{errors.bathrooms.message}</p>}
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -431,43 +450,69 @@ export default function Sell() {
 
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <label className={labelStyle}>Street Address</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Street Address</label> <Require />
+                </div>
                   <Input
                     {...register("address", { required: "Street Address is required" })}
                     className={inputStyle}
                     placeholder="Flat No 101, Tridasa Apartments, MG Road"
                   />
+                  {errors.address && <p className="text-red-400 text-[10px] mt-1">{errors.address.message}</p>}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
-                    <label className={labelStyle}>City</label>
+                    <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>City</label> <Require />
+                </div>
                     <Input 
                       {...register("city", { required: "City is required" })} 
                       className={inputStyle} 
                       placeholder="Mumbai" 
                     />
+                    {errors.city && <p className="text-red-400 text-[10px] mt-1">{errors.city.message}</p>}
                   </div>
                   <div className="space-y-1">
                     <label className={labelStyle}>State</label>
                     <Input 
-                      {...register("state", { required: "State is required" })} 
+                      {...register("state", { required: false })} 
                       className={inputStyle} 
                       placeholder="Maharashtra" 
                     />
                   </div>
+                  
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
-                    <label className={labelStyle}>Zip Code</label>
+                    <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Country</label> <Require />
+                </div>
+                    <Input 
+                      {...register("country", { required: "Country is required" })} 
+                      className={inputStyle} 
+                      placeholder="India" 
+                    />
+                    {errors.country && <p className="text-red-400 text-[10px] mt-1">{errors.country.message}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Zip Code</label> <Require />
+                </div>
                     <Input 
                       {...register("zipCode", { required: "Zip Code is required" })} 
                       className={inputStyle} 
                       placeholder="400050" 
                     />
+                    {errors.zipCode && <p className="text-red-400 text-[10px] mt-1">{errors.zipCode.message}</p>}
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className={labelStyle}>Features & Amenities</label>
+                  <div className= "flex gap-2 items-center">
+                  <label className={labelStyle}>Features & Amenities</label> <Require />
+                </div>
                   <p className="text-white/20 text-[10px] mb-3">Add amenities and features (press Enter to add)</p>
                   <Controller
                     name="features"
@@ -480,6 +525,7 @@ export default function Sell() {
                       />
                     )}
                   />
+                  
                 </div>
               </div>
             </div>
@@ -490,7 +536,9 @@ export default function Sell() {
           {/* Section 2: Media Upload */}
           <section>
             <h2 className={sectionHeading}>
-              <Upload className="w-5 h-5 text-amber-500" /> Cinematic Assets
+              <div className="flex gap-2 items-center">
+                <Upload className="w-5 h-5 text-amber-500" /> Cinematic Assets <Require />
+              </div>
             </h2>
             
             <input 

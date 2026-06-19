@@ -30,6 +30,7 @@ export interface Property {
     city: string;
     state: string;
     zipCode: number;
+    country:string;
     lat: number;
     lng: number;
   };
@@ -65,9 +66,10 @@ export interface CreatePropertyPayload {
 }
 
 export const propertyService = {
-  getCities: async (): Promise<string[]> => {
-    const res = await apiClient.get<string[]>(`/properties/cities`);
-    return Array.isArray(res.data) ? res.data : [];
+    // In your propertyService
+  getCities: (country?: string): Promise<string[]> => {
+    const params = country ? `?country=${encodeURIComponent(country)}` : "";
+    return apiClient.get(`/properties/cities${params}`).then(r => r.data);
   },
 
   getCountries: async (): Promise<string[]> => {

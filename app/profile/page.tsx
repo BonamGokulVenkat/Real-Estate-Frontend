@@ -371,18 +371,29 @@ export default function Profile() {
               const statusBadge = getStatusBadge(p.status, p.pending_action);
               const StatusIcon = statusBadge.icon;
               const isMenuOpen = openMenuId === p.property_id;
+              const isFrozen = p.status !== "available"; // Only "available" properties can be edited or deleted
 
               return (
                 <div key={p.property_id} className="relative group">
-                  <PropertyCard property={p} index={i} />
+                  
+                {/* Pointer-events block on the card itself */}
+                  <div className={isFrozen ? "pointer-events-none select-none grayscale cursor-not-allowed" : ""}>
+                    <PropertyCard property={p} index={i} />
+                  </div>
+                  {/* Grayscale + freeze overlay */}
+                  {isFrozen && (
+                    <div className="absolute inset-0 z-10 rounded-[inherit] bg-black/30 backdrop-grayscale pointer-events-none cursor-not-allowed" />
+                  )}
 
+                  
                   {/* Status badge */}
-                  <div className="absolute bottom-50 right-4 z-20">
+                  <div className="absolute top-4 left-4 z-20">
                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}>
                       <StatusIcon className="w-3 h-3" />
                       <span className="text-[9px] font-bold uppercase tracking-wider">{statusBadge.text}</span>
                     </div>
                   </div>
+
 
                   {/* Three-dot menu — only for available properties */}
                   {p.status === "available" && (
@@ -449,6 +460,23 @@ export default function Profile() {
                       </p>
                     </div>
                   )}
+
+                  {p.status === "pending" && (
+                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-amber-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                      <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">
+                        Awaiting admin approval
+                      </p>
+                    </div>
+                  )}
+
+
+                  {p.status === "rejected" && (
+                  <div className="absolute bottom-4 left-4 right-4 z-20 bg-red-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                    <p className="text-red-400 text-[9px] font-bold uppercase tracking-wider">
+                      Listing rejected by admin
+                    </p>
+                  </div>
+                )}
                 </div>
               );
             })}
