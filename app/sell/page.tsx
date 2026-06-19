@@ -5,12 +5,11 @@ import { useForm } from "react-hook-form";
 import { Upload, Home, Sparkles, Bed, Bath, Ruler, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Require from "@/components/common/required";
-import { Input } from "@/components/ui/input";  
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { propertyService, PropertyStatus, PropertyType } from "@/services/propertyService";
-import { supabase } from "@/lib/supabase";      
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
@@ -29,9 +28,17 @@ interface SellForm {
   address: string;
   city: string;
   state?: string;
-  country:string;
+  country: string;
   zipCode: string;
-  features: string[]
+  features: string[];
+}
+
+// Extend Window to include google
+declare global {
+  interface Window {
+    google: typeof google;
+    initGooglePlaces?: () => void;
+  }
 }
 
 export default function Sell() {
@@ -40,22 +47,23 @@ export default function Sell() {
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addressInputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const { formatPrice, currency, setCurrency, rates } = useCurrency();
 
   const convertToINR = (amount: number): number => {
-  const rate = rates[currency] ?? 1;
-  if (!rate || rate === 0) return amount;
-  return Number((amount / rate).toFixed(2));
-};
-  
-  // State for upload progress
+    const rate = rates[currency] ?? 1;
+    if (!rate || rate === 0) return amount;
+    return Number((amount / rate).toFixed(2));
+  };
+
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   const geocodeAddress = async (
     address: string,
     city: string,
     state: string,
-    country:string,
+    country: string,
     zipCode: string
   ) => {
     const queries = [
@@ -69,15 +77,10 @@ export default function Sell() {
 
     for (const query of queries) {
       const response = await fetch(
-        `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(
-          query
-        )}&limit=1&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`
+        `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(query)}&limit=1&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`
       );
-      if (!response.ok) {
-        continue;
-      }
+      if (!response.ok) continue;
       const result = await response.json();
-
       if (result.features?.length > 0) {
         const location = result.features[0];
         return {
@@ -101,10 +104,94 @@ export default function Sell() {
     watch,
     reset,
     control,
+    setValue,
     formState: { errors },
   } = useForm<SellForm>();
 
-  // Role guard
+  // ─── Google Places Autocomplete ───────────────────────────────────────────
+
+  const initAutocomplete = useCallback(() => {
+    if (!addressInputRef.current || !window.google?.maps?.places) return;
+
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(
+      addressInputRef.current,
+      { types: ["address"] }
+    );
+
+    autocompleteRef.current.addListener("place_changed", () => {
+      const place = autocompleteRef.current!.getPlace();
+      if (!place.address_components) return;
+
+      // Helpers to extract components
+      const get = (type: string) =>
+        place.address_components!.find((c) => c.types.includes(type))?.long_name ?? "";
+      const getShort = (type: string) =>
+        place.address_components!.find((c) => c.types.includes(type))?.short_name ?? "";
+
+      // Build street address: street_number + route
+      const streetNumber = get("street_number");
+      const route = get("route");
+      const streetAddress = [streetNumber, route].filter(Boolean).join(" ");
+
+      // Resolve city from multiple possible component types
+      const city =
+        get("locality") ||
+        get("sublocality_level_1") ||
+        get("sublocality") ||
+        get("postal_town") ||
+        get("administrative_area_level_2");
+
+      const state = get("administrative_area_level_1");
+      const country = get("country");
+      const zipCode = get("postal_code");
+
+      // Update form fields
+      if (streetAddress) setValue("address", streetAddress, { shouldValidate: true });
+      if (city) setValue("city", city, { shouldValidate: true });
+      if (state) setValue("state", state, { shouldValidate: true });
+      if (country) setValue("country", country, { shouldValidate: true });
+      if (zipCode) setValue("zipCode", zipCode, { shouldValidate: true });
+    });
+  }, [setValue]);
+
+  useEffect(() => {
+    // If already loaded, init immediately
+    if (window.google?.maps?.places) {
+      initAutocomplete();
+      return;
+    }
+
+    // Avoid double-loading the script
+    if (document.getElementById("google-maps-script")) {
+      // Script tag exists but not loaded yet — wait for callback
+      window.initGooglePlaces = initAutocomplete;
+      return;
+    }
+
+    // Inject the script
+    window.initGooglePlaces = initAutocomplete;
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initGooglePlaces`;
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+
+    return () => {
+      // Cleanup listener on unmount
+      if (autocompleteRef.current) {
+        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
+  }, [initAutocomplete]);
+
+  // Merge react-hook-form ref with our local ref
+  const { ref: rhfAddressRef, ...addressRegisterProps } = register("address", {
+    required: "Street Address is required",
+  });
+
+  // ─── Auth / Role guard ────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!isAuthenticated) {
       toast.error("Please login to list properties.");
@@ -112,7 +199,10 @@ export default function Sell() {
     } else if (user?.role !== "builder") {
       toast.error("Only registered builders can list properties.");
       router.replace("/");
-    } else if (user?.plan === "FREE" && (user.propertiesPosted || 0) >= (user.propertyLimit ?? 1)) {
+    } else if (
+      user?.plan === "FREE" &&
+      (user.propertiesPosted || 0) >= (user.propertyLimit ?? 1)
+    ) {
       toast.error("Property limit reached. Please upgrade to continue.");
       router.push("/subscription");
     }
@@ -129,9 +219,9 @@ export default function Sell() {
     numericPrice > 0;
 
   const normalizeFile = (file: File): File => {
-    if (file.name.toLowerCase().endsWith('.jfif')) {
-      return new File([file], file.name.replace(/\.jfif$/i, '.jpg'), {
-        type: 'image/jpeg',
+    if (file.name.toLowerCase().endsWith(".jfif")) {
+      return new File([file], file.name.replace(/\.jfif$/i, ".jpg"), {
+        type: "image/jpeg",
       });
     }
     return file;
@@ -157,7 +247,6 @@ export default function Sell() {
       toast.error("You must be logged in to create a listing.");
       return;
     }
-    
     if (files.length === 0) {
       toast.error("Please upload at least one image of the property.");
       return;
@@ -170,7 +259,6 @@ export default function Sell() {
     try {
       const uploadedMedia = [];
 
-      // Upload files
       for (const [index, rawFile] of files.entries()) {
         const file = normalizeFile(rawFile);
         const fileExt = file.name.split(".").pop();
@@ -200,12 +288,17 @@ export default function Sell() {
           thumbnail_url: publicUrl,
           display_order: index,
         });
-        
+
         setUploadProgress(((index + 1) / files.length) * 50);
       }
 
-      // Get coordinates
-      const coordinates = await geocodeAddress(data.address, data.city, data.state || "", data.country, data.zipCode);
+      const coordinates = await geocodeAddress(
+        data.address,
+        data.city,
+        data.state || "",
+        data.country,
+        data.zipCode
+      );
       if (!coordinates) {
         toast.error("Unable to locate property. Please verify the address.", { id: toastId });
         setIsSubmitting(false);
@@ -216,10 +309,11 @@ export default function Sell() {
       toast.loading("Publishing property details...", { id: toastId });
 
       const priceInSelectedCurrency = Number(data.price);
-      const priceInINR = !isNaN(priceInSelectedCurrency) && isFinite(priceInSelectedCurrency)
-      ? convertToINR(priceInSelectedCurrency): data.price;
+      const priceInINR =
+        !isNaN(priceInSelectedCurrency) && isFinite(priceInSelectedCurrency)
+          ? convertToINR(priceInSelectedCurrency)
+          : data.price;
 
-      // ✅ CORRECTED PAYLOAD STRUCTURE
       const payload = {
         title: data.title,
         description: data.description || "A luxury estate.",
@@ -239,41 +333,34 @@ export default function Sell() {
           lng: coordinates.lng,
         },
         features: data.features || [],
-        status: "pending" as PropertyStatus, // ✅ Changed to "pending" for admin approval
+        status: "pending" as PropertyStatus,
         media: uploadedMedia,
-        builder: { user_id: user.user_id }
+        builder: { user_id: user.user_id },
       };
 
-      console.log("Sending payload:", payload);
-      
       const property = await propertyService.create(payload);
-      
+
       setUploadProgress(100);
       toast.success("Property submitted for admin approval!", { id: toastId });
-      
-      // Update local store state
+
       if (user) {
         useAuthStore.getState().updateUser({
-          propertiesPosted: (user.propertiesPosted || 0) + 1
+          propertiesPosted: (user.propertiesPosted || 0) + 1,
         });
       }
 
       reset();
       setFiles([]);
       router.push("/profile");
-
     } catch (error: any) {
-      console.error("LISTING ERROR DETAILS:", error);
-      console.error("Error response:", error.response?.data);
-      console.error("Error status:", error.response?.status);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error ||
-                          error.message || 
-                          "Failed to list property.";
-      
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to list property.";
+
       toast.error(errorMessage, { id: toastId });
-      
+
       if (error.response?.status === 409 || errorMessage.includes("LIMIT_REACHED")) {
         setTimeout(() => router.push("/subscription"), 2000);
       }
@@ -283,9 +370,12 @@ export default function Sell() {
     }
   };
 
-  const sectionHeading = "font-serif text-xl font-bold text-white mb-8 flex items-center gap-3 italic";
-  const inputStyle = "bg-white/[0.03] border-white/10 rounded-xl focus:border-amber-500/50 focus:ring-amber-500/10 text-white placeholder:text-white/20 h-12";
-  const labelStyle = "text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block";
+  const sectionHeading =
+    "font-serif text-xl font-bold text-white mb-8 flex items-center gap-3 italic";
+  const inputStyle =
+    "bg-white/[0.03] border-white/10 rounded-xl focus:border-amber-500/50 focus:ring-amber-500/10 text-white placeholder:text-white/20 h-12";
+  const labelStyle =
+    "text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block";
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
@@ -299,16 +389,18 @@ export default function Sell() {
         >
           <div className="flex items-center justify-center gap-3">
             <span className="h-[1px] w-8 bg-amber-500/50" />
-            <span className="text-amber-500 text-[10px] font-bold uppercase tracking-[0.4em] uppercase">
+            <span className="text-amber-500 text-[10px] font-bold uppercase tracking-[0.4em]">
               Private Listing
             </span>
             <span className="h-[1px] w-8 bg-amber-500/50" />
           </div>
           <h1 className="font-serif text-5xl md:text-7xl font-bold tracking-tighter">
-            Sell Your <span className="text-white/40 italic font-light">Estate</span>
+            Sell Your{" "}
+            <span className="text-white/40 italic font-light">Estate</span>
           </h1>
           <p className="text-white/40 max-w-xl mx-auto text-lg font-light leading-relaxed">
-            Connect with a global network of premium buyers. List your architectural masterpiece on the Luxora standard.
+            Connect with a global network of premium buyers. List your
+            architectural masterpiece on the Luxora standard.
           </p>
         </motion.div>
 
@@ -326,35 +418,42 @@ export default function Sell() {
             </h2>
             <div className="space-y-8">
               <div className="space-y-1">
-                <div className= "flex gap-2 items-center">
+                <div className="flex gap-2 items-center">
                   <label className={labelStyle}>Listing Title</label> <Require />
                 </div>
-                <Input 
-                  {...register("title", { required: "Title is required" })} 
-                  className={`${inputStyle} ${errors.title ? "border-red-500/50" : ""}`} 
-                  placeholder="The Glass Pavilion, Worli" 
+                <Input
+                  {...register("title", { required: "Title is required" })}
+                  className={`${inputStyle} ${errors.title ? "border-red-500/50" : ""}`}
+                  placeholder="The Glass Pavilion, Worli"
                 />
-                {errors.title && <p className="text-red-400 text-[10px] mt-1">{errors.title.message}</p>}
+                {errors.title && (
+                  <p className="text-red-400 text-[10px] mt-1">{errors.title.message}</p>
+                )}
               </div>
 
               <div className="space-y-1">
-                <div className= "flex gap-2 items-center">
+                <div className="flex gap-2 items-center">
                   <label className={labelStyle}>Description</label> <Require />
                 </div>
-                <textarea 
-                  {...register("description", { required: "Description is required" })} 
-                  className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${errors.description ? "border-red-500/50" : ""}`} 
-                  placeholder="Describe the details of your property..." 
+                <textarea
+                  {...register("description", { required: "Description is required" })}
+                  className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${errors.description ? "border-red-500/50" : ""}`}
+                  placeholder="Describe the details of your property..."
                 />
-                {errors.description && <p className="text-red-400 text-[10px] mt-1">{errors.description.message}</p>}
+                {errors.description && (
+                  <p className="text-red-400 text-[10px] mt-1">{errors.description.message}</p>
+                )}
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Property Type</label> <Require />
-                </div>
-                  <select {...register("type", { required: "Property type is required" })} className={`${inputStyle} w-full px-3 appearance-none`}>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Property Type</label> <Require />
+                  </div>
+                  <select
+                    {...register("type", { required: "Property type is required" })}
+                    className={`${inputStyle} w-full px-3 appearance-none`}
+                  >
                     <option value="">Select Type</option>
                     <option value="villa" className="bg-[#0D2137]">Villa</option>
                     <option value="penthouse" className="bg-[#0D2137]">Penthouse</option>
@@ -365,12 +464,15 @@ export default function Sell() {
                     <option value="land" className="bg-[#0D2137]">Land</option>
                     <option value="commercial" className="bg-[#0D2137]">Commercial</option>
                   </select>
-                  {errors.type && <p className="text-red-400 text-[10px] mt-1">{errors.type.message}</p>}
+                  {errors.type && (
+                    <p className="text-red-400 text-[10px] mt-1">{errors.type.message}</p>
+                  )}
                 </div>
+
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Asking Price</label> <Require />
-                </div>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Asking Price</label> <Require />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
                     <div className="space-y-2 w-18">
                       <select
@@ -384,20 +486,23 @@ export default function Sell() {
                         <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
                         <option value="AED" className="bg-[#0D2137]">AED</option>
                       </select>
-                      {errors.price && <p className="text-red-400 text-[10px] mt-1">{errors.price.message}</p>}
                     </div>
                     <div className="col-span-3">
-                      <Input 
-                        {...register("price", { required: "Price is required" })} 
-                        type="text" 
-                        className={inputStyle} 
-                        placeholder="e.g., 120000000 or On Request" 
+                      <Input
+                        {...register("price", { required: "Price is required" })}
+                        type="text"
+                        className={inputStyle}
+                        placeholder="e.g., 120000000 or On Request"
                       />
                     </div>
                   </div>
+                  {errors.price && (
+                    <p className="text-red-400 text-[10px] mt-1">{errors.price.message}</p>
+                  )}
                   {isNumericPrice && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      ≈ {formatPrice(convertToINR(numericPrice))} · value in INR: ₹{Math.round(convertToINR(numericPrice)).toLocaleString('en-IN')}
+                      ≈ {formatPrice(convertToINR(numericPrice))} · value in INR: ₹
+                      {Math.round(convertToINR(numericPrice)).toLocaleString("en-IN")}
                     </p>
                   )}
                 </div>
@@ -405,127 +510,156 @@ export default function Sell() {
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Bedrooms</label> <Require />
-                </div>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Bedrooms</label> <Require />
+                  </div>
                   <div className="relative">
                     <Bed className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("bedrooms", { required: "Number of bedrooms is required", valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="4" 
+                    <Input
+                      {...register("bedrooms", {
+                        required: "Number of bedrooms is required",
+                        valueAsNumber: true,
+                      })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="4"
                     />
-                    {errors.bedrooms && <p className="text-red-400 text-[10px] mt-1">{errors.bedrooms.message}</p>}
+                    {errors.bedrooms && (
+                      <p className="text-red-400 text-[10px] mt-1">{errors.bedrooms.message}</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Bathrooms</label> <Require />
-                </div>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Bathrooms</label> <Require />
+                  </div>
                   <div className="relative">
                     <Bath className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("bathrooms", { required: "Number of bathrooms is required", valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="5" 
+                    <Input
+                      {...register("bathrooms", {
+                        required: "Number of bathrooms is required",
+                        valueAsNumber: true,
+                      })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="5"
                     />
-                    {errors.bathrooms && <p className="text-red-400 text-[10px] mt-1">{errors.bathrooms.message}</p>}
+                    {errors.bathrooms && (
+                      <p className="text-red-400 text-[10px] mt-1">{errors.bathrooms.message}</p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1">
                   <label className={labelStyle}>Area (Sq.Ft)</label>
                   <div className="relative">
                     <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("size", { valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="6500" 
+                    <Input
+                      {...register("size", { valueAsNumber: true })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="6500"
                     />
                   </div>
                 </div>
               </div>
 
+              {/* ─── Address Section ──────────────────────────────────────────── */}
               <div className="space-y-8">
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Street Address</label> <Require />
-                </div>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Street Address</label> <Require />
+                  </div>
+                  {/* 
+                    We split the RHF ref and the DOM ref so that:
+                    - react-hook-form tracks value/validation via rhfAddressRef
+                    - Google Places targets the actual DOM node via addressInputRef
+                  */}
                   <Input
-                    {...register("address", { required: "Street Address is required" })}
-                    className={inputStyle}
-                    placeholder="Flat No 101, Tridasa Apartments, MG Road"
+                    {...addressRegisterProps}
+                    ref={(el) => {
+                      rhfAddressRef(el);
+                      addressInputRef.current = el;
+                    }}
+                    className={`${inputStyle} ${errors.address ? "border-red-500/50" : ""}`}
+                    placeholder="Start typing your address..."
+                    autoComplete="off"
                   />
-                  {errors.address && <p className="text-red-400 text-[10px] mt-1">{errors.address.message}</p>}
+                  {errors.address && (
+                    <p className="text-red-400 text-[10px] mt-1">{errors.address.message}</p>
+                  )}
+                  <p className="text-white/20 text-[10px] mt-1">
+                    Powered by Google Places — city, state, country & zip will fill automatically
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
-                    <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>City</label> <Require />
-                </div>
-                    <Input 
-                      {...register("city", { required: "City is required" })} 
-                      className={inputStyle} 
-                      placeholder="Mumbai" 
+                    <div className="flex gap-2 items-center">
+                      <label className={labelStyle}>City</label> <Require />
+                    </div>
+                    <Input
+                      {...register("city", { required: "City is required" })}
+                      className={inputStyle}
+                      placeholder="Mumbai"
                     />
-                    {errors.city && <p className="text-red-400 text-[10px] mt-1">{errors.city.message}</p>}
+                    {errors.city && (
+                      <p className="text-red-400 text-[10px] mt-1">{errors.city.message}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className={labelStyle}>State</label>
-                    <Input 
-                      {...register("state", { required: false })} 
-                      className={inputStyle} 
-                      placeholder="Maharashtra" 
+                    <Input
+                      {...register("state")}
+                      className={inputStyle}
+                      placeholder="Maharashtra"
                     />
                   </div>
-                  
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
-                    <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Country</label> <Require />
-                </div>
-                    <Input 
-                      {...register("country", { required: "Country is required" })} 
-                      className={inputStyle} 
-                      placeholder="India" 
+                    <div className="flex gap-2 items-center">
+                      <label className={labelStyle}>Country</label> <Require />
+                    </div>
+                    <Input
+                      {...register("country", { required: "Country is required" })}
+                      className={inputStyle}
+                      placeholder="India"
                     />
-                    {errors.country && <p className="text-red-400 text-[10px] mt-1">{errors.country.message}</p>}
+                    {errors.country && (
+                      <p className="text-red-400 text-[10px] mt-1">{errors.country.message}</p>
+                    )}
                   </div>
                   <div className="space-y-1">
-                    <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Zip Code</label> <Require />
-                </div>
-                    <Input 
-                      {...register("zipCode", { required: "Zip Code is required" })} 
-                      className={inputStyle} 
-                      placeholder="400050" 
+                    <div className="flex gap-2 items-center">
+                      <label className={labelStyle}>Zip Code</label> <Require />
+                    </div>
+                    <Input
+                      {...register("zipCode", { required: "Zip Code is required" })}
+                      className={inputStyle}
+                      placeholder="400050"
                     />
-                    {errors.zipCode && <p className="text-red-400 text-[10px] mt-1">{errors.zipCode.message}</p>}
+                    {errors.zipCode && (
+                      <p className="text-red-400 text-[10px] mt-1">{errors.zipCode.message}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <div className= "flex gap-2 items-center">
-                  <label className={labelStyle}>Features & Amenities</label> <Require />
-                </div>
-                  <p className="text-white/20 text-[10px] mb-3">Add amenities and features (press Enter to add)</p>
+                  <div className="flex gap-2 items-center">
+                    <label className={labelStyle}>Features & Amenities</label> <Require />
+                  </div>
+                  <p className="text-white/20 text-[10px] mb-3">
+                    Add amenities and features (press Enter to add)
+                  </p>
                   <Controller
                     name="features"
                     control={control}
                     defaultValue={[]}
                     render={({ field }) => (
-                      <TagInput
-                        value={field.value || []}
-                        onChange={field.onChange}
-                      />
+                      <TagInput value={field.value || []} onChange={field.onChange} />
                     )}
                   />
-                  
                 </div>
               </div>
             </div>
@@ -540,24 +674,28 @@ export default function Sell() {
                 <Upload className="w-5 h-5 text-amber-500" /> Cinematic Assets <Require />
               </div>
             </h2>
-            
-            <input 
-              type="file" 
-              multiple 
+
+            <input
+              type="file"
+              multiple
               accept="image/*,video/*"
-              className="hidden" 
+              className="hidden"
               ref={fileInputRef}
               onChange={handleFileChange}
             />
-            
-            <div 
+
+            <div
               onClick={() => fileInputRef.current?.click()}
               className="group border-2 border-dashed border-white/10 rounded-[32px] p-16 text-center hover:border-amber-500/50 hover:bg-white/[0.02] transition-all cursor-pointer relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
               <Upload className="w-12 h-12 text-white/20 mx-auto mb-6 group-hover:text-amber-500 group-hover:scale-110 transition-all duration-500" />
-              <p className="text-white font-serif text-lg italic group-hover:text-white transition-colors">Click to upload architectural photography</p>
-              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">High-resolution JPEGs and Videos (Max 30 MB each)</p>
+              <p className="text-white font-serif text-lg italic group-hover:text-white transition-colors">
+                Click to upload architectural photography
+              </p>
+              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">
+                High-resolution JPEGs and Videos (Max 30 MB each)
+              </p>
             </div>
 
             {files.length > 0 && (
@@ -567,12 +705,19 @@ export default function Sell() {
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {files.map((file, i) => (
-                    <div key={i} className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5">
+                    <div
+                      key={i}
+                      className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5"
+                    >
                       <div className="absolute inset-0 p-4 flex flex-col items-center justify-center text-center">
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest line-clamp-2">{file.name}</p>
-                        <p className="text-[9px] text-white/40 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest line-clamp-2">
+                          {file.name}
+                        </p>
+                        <p className="text-[9px] text-white/40 mt-1">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
                       </div>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => removeFile(i)}
                         className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
@@ -588,12 +733,14 @@ export default function Sell() {
             {isSubmitting && uploadProgress > 0 && (
               <div className="mt-4">
                 <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-amber-500 transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
                   />
                 </div>
-                <p className="text-white/30 text-[10px] text-center mt-2">Uploading... {Math.round(uploadProgress)}%</p>
+                <p className="text-white/30 text-[10px] text-center mt-2">
+                  Uploading... {Math.round(uploadProgress)}%
+                </p>
               </div>
             )}
           </section>
