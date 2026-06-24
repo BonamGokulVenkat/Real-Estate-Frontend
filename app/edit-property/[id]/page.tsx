@@ -3,14 +3,29 @@
 
 import { motion } from "framer-motion";
 import { useForm, Controller } from "react-hook-form";
-import { Upload, Home, User, Sparkles, IndianRupee, Ruler, Bed, Bath, Loader2, X, ArrowLeft } from "lucide-react";
+import {
+  Upload,
+  Home,
+  Sparkles,
+  Ruler,
+  Bed,
+  Bath,
+  Loader2,
+  X,
+  ArrowLeft,
+  ImageIcon,
+  Video,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useState, useRef, useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
-import { propertyService, Property, PropertyType } from "@/services/propertyService";
-import { supabase } from "@/lib/supabase";
+import {
+  propertyService,
+  Property,
+  PropertyType,
+} from "@/services/propertyService";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter, useParams } from "next/navigation";
@@ -38,53 +53,22 @@ export default function EditProperty() {
   const router = useRouter();
   const params = useParams();
   const propertyId = params.id as string;
+
   const { user, isAuthenticated } = useAuthStore();
-  const [files, setFiles] = useState<File[]>([]);
-  const [existingMedia, setExistingMedia] = useState<any[]>([]);
-  const [mediaToDelete, setMediaToDelete] = useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { formatPrice, currency, setCurrency } = useCurrency();
 
-  // Fetch property data
-  const { data: property, refetch } = useQuery<Property>({
+  const [files, setFiles] = useState<File[]>([]);
+  const [existingMedia, setExistingMedia] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPageReady, setIsPageReady] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: property, isLoading } = useQuery<Property>({
     queryKey: ["property", propertyId],
     queryFn: () => propertyService.getById(propertyId),
     enabled: !!propertyId,
   });
-
-  // Check authorization and load property
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-
-    if (property) {
-      // Check if user owns this property
-      if (property.builder?.user_id !== user?.user_id && user?.role !== "admin") {
-        toast.error("You don't have permission to edit this property");
-        router.push("/profile");
-        return;
-      }
-      
-      // Check if property can be edited
-      if (property.status === "edit_pending") {
-        toast.error("This property already has a pending edit request");
-        router.push("/profile");
-        return;
-      }
-      
-      if (property.status === "delete_pending") {
-        toast.error("This property is pending deletion and cannot be edited");
-        router.push("/profile");
-        return;
-      }
-      
-      setIsLoading(false);
-    }
-  }, [property, isAuthenticated, user, router]);
 
   const {
     register,
@@ -95,26 +79,50 @@ export default function EditProperty() {
     formState: { errors },
   } = useForm<EditFormData>();
 
-  // Reset form when property loads
   useEffect(() => {
-    if (property) {
-      reset({
-        title: property.title,
-        description: property.description,
-        property_type: property.property_type,
-        bedrooms: property.bedrooms,
-        bathrooms: property.bathrooms,
-        size_sqft: property.size_sqft ?? undefined,
-        price: property.price,
-        address: property.location?.address || "",
-        city: property.location?.city || "",
-        state: property.location?.state || "",
-        zipCode: property.location?.zipCode?.toString() || "",
-        features: property.features || [],
-      });
-      setExistingMedia(property.media || []);
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
     }
-  }, [property, reset]);
+
+    if (!property) return;
+
+    if (property.builder?.user_id !== user?.user_id && user?.role !== "admin") {
+      toast.error("You don't have permission to edit this property");
+      router.push("/profile");
+      return;
+    }
+
+    if (property.status === "edit_pending") {
+      toast.error("This property already has a pending edit request");
+      router.push("/profile");
+      return;
+    }
+
+    if (property.status === "delete_pending") {
+      toast.error("This property is pending deletion and cannot be edited");
+      router.push("/profile");
+      return;
+    }
+
+    reset({
+      title: property.title,
+      description: property.description,
+      property_type: property.property_type,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      size_sqft: property.size_sqft ?? undefined,
+      price: property.price,
+      address: property.location?.address || "",
+      city: property.location?.city || "",
+      state: property.location?.state || "",
+      zipCode: property.location?.zipCode?.toString() || "",
+      features: property.features || [],
+    });
+
+    setExistingMedia(property.media || []);
+    setIsPageReady(true);
+  }, [property, isAuthenticated, user, router, reset]);
 
   const geocodeAddress = async (
     address: string,
@@ -137,37 +145,60 @@ export default function EditProperty() {
           query
         )}&limit=1&apiKey=${process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY}`
       );
-      if (!response.ok) {
-        continue;
-      }
+
+      if (!response.ok) continue;
+
       const result = await response.json();
 
       if (result.features?.length > 0) {
         const location = result.features[0];
+
         return {
           lat: location.properties.lat,
           lng: location.properties.lon,
-          confidence:
-            query === `${address}, ${city}, ${state}, ${zipCode}`
-              ? "HIGH"
-              : query === `${address}, ${city}, ${state}`
-              ? "MEDIUM"
-              : "LOW",
         };
       }
     }
+
     return null;
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      if (files.length + newFiles.length > 15) {
-        toast.error("You can upload a maximum of 15 images.");
-        return;
-      }
-      setFiles((prev) => [...prev, ...newFiles]);
+  const normalizeFile = (file: File): File => {
+    if (file.name.toLowerCase().endsWith(".jfif")) {
+      return new File([file], file.name.replace(/\.jfif$/i, ".jpg"), {
+        type: "image/jpeg",
+      });
     }
+
+    return file;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+
+    const newFiles = Array.from(e.target.files);
+
+    const totalMediaCount =
+      existingMedia.length + files.length + newFiles.length;
+
+    if (totalMediaCount > 15) {
+      toast.error("You can keep a maximum of 15 media files.");
+      e.target.value = "";
+      return;
+    }
+
+    const tooLargeFile = newFiles.find(
+      (file) => file.size > 30 * 1024 * 1024
+    );
+
+    if (tooLargeFile) {
+      toast.error(`${tooLargeFile.name} is larger than 30 MB.`);
+      e.target.value = "";
+      return;
+    }
+
+    setFiles((prev) => [...prev, ...newFiles]);
+    e.target.value = "";
   };
 
   const removeFile = (index: number) => {
@@ -175,17 +206,7 @@ export default function EditProperty() {
   };
 
   const removeExistingMedia = (mediaId: string) => {
-    setMediaToDelete((prev) => [...prev, mediaId]);
     setExistingMedia((prev) => prev.filter((m) => m.media_id !== mediaId));
-  };
-
-  const normalizeFile = (file: File): File => {
-    if (file.name.toLowerCase().endsWith('.jfif')) {
-      return new File([file], file.name.replace(/\.jfif$/i, '.jpg'), {
-        type: 'image/jpeg',
-      });
-    }
-    return file;
   };
 
   const onSubmit = async (data: EditFormData) => {
@@ -195,8 +216,8 @@ export default function EditProperty() {
     const toastId = toast.loading("Submitting edit request...");
 
     try {
-      // Upload new media
       const uploadedMedia = [];
+
       for (const [index, rawFile] of files.entries()) {
         const file = normalizeFile(rawFile);
         const fileExt = file.name.split(".").pop();
@@ -223,20 +244,36 @@ export default function EditProperty() {
           media_type: file.type.startsWith("video/") ? "video" : "image",
           room_type: "other",
           url: publicUrl,
-          thumbnail_url: publicUrl,
+          thumbnail_url: file.type.startsWith("video/") ? null : publicUrl,
           display_order: existingMedia.length + index,
         });
       }
 
-      // Get coordinates
-      const coordinates = await geocodeAddress(data.address, data.city, data.state, data.zipCode);
+      const coordinates = await geocodeAddress(
+        data.address,
+        data.city,
+        data.state,
+        data.zipCode
+      );
+
       if (!coordinates) {
-        toast.error("Unable to locate property. Please verify the address.", { id: toastId });
+        toast.error("Unable to locate property. Please verify the address.", {
+          id: toastId,
+        });
         setIsSubmitting(false);
         return;
       }
 
-      // Prepare edit payload
+      const finalMedia = [...existingMedia, ...uploadedMedia].map(
+        (media, index) => ({
+          url: media.url || media.media_url,
+          media_type: media.media_type || "image",
+          room_type: media.room_type || "other",
+          thumbnail_url: media.thumbnail_url || null,
+          display_order: index,
+        })
+      );
+
       const editPayload = {
         title: data.title,
         description: data.description,
@@ -254,25 +291,33 @@ export default function EditProperty() {
           lng: coordinates.lng,
         },
         features: data.features,
-        media: [...existingMedia, ...uploadedMedia],
-        mediaToDelete: mediaToDelete,
+        media: finalMedia,
       };
 
-      // Submit edit request
       await propertyService.requestEdit(propertyId, editPayload);
 
-      toast.success("Edit request submitted for admin approval!", { id: toastId });
-      router.push("/profile");
+      toast.success("Edit request submitted for admin approval!", {
+        id: toastId,
+      });
 
+      router.push("/profile");
     } catch (error: any) {
       console.error("EDIT ERROR:", error);
-      toast.error(error.response?.data?.message || error.message || "Failed to submit edit request.", { id: toastId });
+
+      toast.error(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to submit edit request.",
+        {
+          id: toastId,
+        }
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !isPageReady) {
     return (
       <div className="min-h-screen pt-32 flex justify-center bg-[#0A192F]">
         <Loader2 className="w-10 h-10 text-amber-500 animate-spin" />
@@ -284,6 +329,7 @@ export default function EditProperty() {
     return (
       <div className="min-h-screen pt-32 flex flex-col items-center justify-center bg-[#0A192F]">
         <p className="text-white/60 mb-4">Property not found</p>
+
         <Link href="/profile">
           <Button className="bg-amber-500 hover:bg-amber-400 text-[#0A192F]">
             Back to Profile
@@ -295,21 +341,34 @@ export default function EditProperty() {
 
   const currentPrice = watch("price");
   const numericPrice = Number(currentPrice);
-  const isNumericPrice = currentPrice?.trim() !== "" && !isNaN(numericPrice) && isFinite(numericPrice) && numericPrice > 0;
+  const isNumericPrice =
+    currentPrice?.trim() !== "" &&
+    !isNaN(numericPrice) &&
+    isFinite(numericPrice) &&
+    numericPrice > 0;
 
-  const sectionHeading = "font-serif text-xl font-bold text-white mb-8 flex items-center gap-3 italic";
-  const inputStyle = "bg-white/[0.03] border-white/10 rounded-xl focus:border-amber-500/50 focus:ring-amber-500/10 text-white placeholder:text-white/20 h-12";
-  const labelStyle = "text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block";
+  const sectionHeading =
+    "font-serif text-xl font-bold text-white mb-8 flex items-center gap-3 italic";
+
+  const inputStyle =
+    "bg-white/[0.03] border-white/10 rounded-xl focus:border-amber-500/50 focus:ring-amber-500/10 text-white placeholder:text-white/20 h-12";
+
+  const labelStyle =
+    "text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-2 block";
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[600px] bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.05)_0%,transparent_70%)] pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-8 max-w-3xl relative z-10">
-        {/* Back Button */}
-        <Link href="/profile" className="inline-flex items-center gap-2 text-white/40 hover:text-amber-500 transition-colors mb-8">
+        <Link
+          href="/profile"
+          className="inline-flex items-center gap-2 text-white/40 hover:text-amber-500 transition-colors mb-8"
+        >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-[10px] font-bold uppercase tracking-widest">Back to Profile</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest">
+            Back to Profile
+          </span>
         </Link>
 
         <motion.div
@@ -324,9 +383,12 @@ export default function EditProperty() {
             </span>
             <span className="h-[1px] w-8 bg-amber-500/50" />
           </div>
+
           <h1 className="font-serif text-5xl md:text-6xl font-bold tracking-tighter">
-            Edit <span className="text-white/40 italic font-light">Property</span>
+            Edit{" "}
+            <span className="text-white/40 italic font-light">Property</span>
           </h1>
+
           <p className="text-white/40 max-w-xl mx-auto text-lg font-light leading-relaxed">
             Your changes will be reviewed by an admin before going live.
           </p>
@@ -339,48 +401,91 @@ export default function EditProperty() {
           onSubmit={handleSubmit(onSubmit)}
           className="bg-white/[0.02] backdrop-blur-3xl border border-white/10 rounded-[40px] p-8 md:p-12 space-y-16 shadow-2xl"
         >
-          {/* Section 1: Property Details */}
           <section>
             <h2 className={sectionHeading}>
-              <Home className="w-5 h-5 text-amber-500" /> Estate Specifications
+              <Home className="w-5 h-5 text-amber-500" />
+              Estate Specifications
             </h2>
+
             <div className="space-y-8">
               <div className="space-y-1">
                 <label className={labelStyle}>Listing Title</label>
-                <Input 
-                  {...register("title", { required: "Title is required" })} 
-                  className={`${inputStyle} ${errors.title ? "border-red-500/50" : ""}`} 
-                  placeholder="The Glass Pavilion, Worli" 
+
+                <Input
+                  {...register("title", {
+                    required: "Title is required",
+                  })}
+                  className={`${inputStyle} ${
+                    errors.title ? "border-red-500/50" : ""
+                  }`}
+                  placeholder="The Glass Pavilion, Worli"
                 />
-                {errors.title && <p className="text-red-400 text-[10px] mt-1">{errors.title.message}</p>}
+
+                {errors.title && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {errors.title.message}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1">
                 <label className={labelStyle}>Description</label>
-                <textarea 
-                  {...register("description", { required: "Description is required" })} 
-                  className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${errors.description ? "border-red-500/50" : ""}`} 
-                  placeholder="Describe the details of your property..." 
+
+                <textarea
+                  {...register("description", {
+                    required: "Description is required",
+                  })}
+                  className={`${inputStyle} w-full p-4 min-h-[120px] resize-y ${
+                    errors.description ? "border-red-500/50" : ""
+                  }`}
+                  placeholder="Describe the details of your property..."
                 />
-                {errors.description && <p className="text-red-400 text-[10px] mt-1">{errors.description.message}</p>}
+
+                {errors.description && (
+                  <p className="text-red-400 text-[10px] mt-1">
+                    {errors.description.message}
+                  </p>
+                )}
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-1">
                   <label className={labelStyle}>Property Type</label>
-                  <select {...register("property_type")} className={`${inputStyle} w-full px-3 appearance-none`}>
-                    <option value="villa" className="bg-[#0D2137]">Villa</option>
-                    <option value="penthouse" className="bg-[#0D2137]">Penthouse</option>
-                    <option value="mansion" className="bg-[#0D2137]">Mansion</option>
-                    <option value="apartment" className="bg-[#0D2137]">Apartment</option>
-                    <option value="townhouse" className="bg-[#0D2137]">Townhouse</option>
-                    <option value="house" className="bg-[#0D2137]">House</option>
-                    <option value="land" className="bg-[#0D2137]">Land</option>
-                    <option value="commercial" className="bg-[#0D2137]">Commercial</option>
+
+                  <select
+                    {...register("property_type")}
+                    className={`${inputStyle} w-full px-3 appearance-none`}
+                  >
+                    <option value="villa" className="bg-[#0D2137]">
+                      Villa
+                    </option>
+                    <option value="penthouse" className="bg-[#0D2137]">
+                      Penthouse
+                    </option>
+                    <option value="mansion" className="bg-[#0D2137]">
+                      Mansion
+                    </option>
+                    <option value="apartment" className="bg-[#0D2137]">
+                      Apartment
+                    </option>
+                    <option value="townhouse" className="bg-[#0D2137]">
+                      Townhouse
+                    </option>
+                    <option value="house" className="bg-[#0D2137]">
+                      House
+                    </option>
+                    <option value="land" className="bg-[#0D2137]">
+                      Land
+                    </option>
+                    <option value="commercial" className="bg-[#0D2137]">
+                      Commercial
+                    </option>
                   </select>
                 </div>
+
                 <div className="space-y-1">
-                  <label className={labelStyle}>Asking Price (in INR)</label>
+                  <label className={labelStyle}>Asking Price</label>
+
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
                     <div className="space-y-2 w-18">
                       <select
@@ -388,27 +493,39 @@ export default function EditProperty() {
                         onChange={(e) => setCurrency(e.target.value as any)}
                         className={`${inputStyle} w-full px-3 appearance-none`}
                       >
-                        <option value="INR" className="bg-[#0D2137]">₹ INR</option>
-                        <option value="USD" className="bg-[#0D2137]">$ USD</option>
-                        <option value="EUR" className="bg-[#0D2137]">€ EUR</option>
-                        <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
-                        <option value="AED" className="bg-[#0D2137]">AED</option>
+                        <option value="INR" className="bg-[#0D2137]">
+                          ₹ INR
+                        </option>
+                        <option value="USD" className="bg-[#0D2137]">
+                          $ USD
+                        </option>
+                        <option value="EUR" className="bg-[#0D2137]">
+                          € EUR
+                        </option>
+                        <option value="GBP" className="bg-[#0D2137]">
+                          £ GBP
+                        </option>
+                        <option value="AED" className="bg-[#0D2137]">
+                          AED
+                        </option>
                       </select>
                     </div>
+
                     <div className="space-y-1 w-58">
-                      <Input 
-                        {...register("price", { required: "Price is required" })} 
-                        type="text" 
-                        className={`${inputStyle} pl-12`} 
-                        placeholder="120000000 or Price on Request" 
+                      <Input
+                        {...register("price", {
+                          required: "Price is required",
+                        })}
+                        type="text"
+                        className={`${inputStyle} pl-4`}
+                        placeholder="120000000 or Price on Request"
                       />
                     </div>
                   </div>
+
                   {isNumericPrice && (
                     <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      <span className="text-amber-500 text-xs mt-2">
-                        Estimated: {formatPrice(numericPrice)}
-                      </span>
+                      Estimated: {formatPrice(numericPrice)}
                     </p>
                   )}
                 </div>
@@ -417,37 +534,53 @@ export default function EditProperty() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
                   <label className={labelStyle}>Beds</label>
+
                   <div className="relative">
                     <Bed className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("bedrooms", { required: "Required", valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="4" 
+
+                    <Input
+                      {...register("bedrooms", {
+                        required: "Required",
+                        valueAsNumber: true,
+                      })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="4"
                     />
                   </div>
                 </div>
+
                 <div className="space-y-1">
                   <label className={labelStyle}>Baths</label>
+
                   <div className="relative">
                     <Bath className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("bathrooms", { required: "Required", valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="5" 
+
+                    <Input
+                      {...register("bathrooms", {
+                        required: "Required",
+                        valueAsNumber: true,
+                      })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="5"
                     />
                   </div>
                 </div>
+
                 <div className="space-y-1 col-span-2 md:col-span-1">
                   <label className={labelStyle}>Sqft</label>
+
                   <div className="relative">
                     <Ruler className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                    <Input 
-                      {...register("size_sqft", { valueAsNumber: true })} 
-                      type="number" 
-                      className={`${inputStyle} pl-12`} 
-                      placeholder="6500" 
+
+                    <Input
+                      {...register("size_sqft", {
+                        valueAsNumber: true,
+                      })}
+                      type="number"
+                      className={`${inputStyle} pl-12`}
+                      placeholder="6500"
                     />
                   </div>
                 </div>
@@ -456,8 +589,11 @@ export default function EditProperty() {
               <div className="space-y-8">
                 <div className="space-y-1">
                   <label className={labelStyle}>Street Address</label>
+
                   <Input
-                    {...register("address", { required: "Street Address is required" })}
+                    {...register("address", {
+                      required: "Street Address is required",
+                    })}
                     className={inputStyle}
                     placeholder="Flat No 101, Tridasa Apartments, MG Road"
                   />
@@ -466,33 +602,48 @@ export default function EditProperty() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="space-y-1">
                     <label className={labelStyle}>City</label>
-                    <Input 
-                      {...register("city", { required: "City is required" })} 
-                      className={inputStyle} 
-                      placeholder="Mumbai" 
+
+                    <Input
+                      {...register("city", {
+                        required: "City is required",
+                      })}
+                      className={inputStyle}
+                      placeholder="Mumbai"
                     />
                   </div>
+
                   <div className="space-y-1">
                     <label className={labelStyle}>State</label>
-                    <Input 
-                      {...register("state", { required: "State is required" })} 
-                      className={inputStyle} 
-                      placeholder="Maharashtra" 
+
+                    <Input
+                      {...register("state", {
+                        required: "State is required",
+                      })}
+                      className={inputStyle}
+                      placeholder="Maharashtra"
                     />
                   </div>
+
                   <div className="space-y-1">
                     <label className={labelStyle}>Zip Code</label>
-                    <Input 
-                      {...register("zipCode", { required: "Zip Code is required" })} 
-                      className={inputStyle} 
-                      placeholder="400050" 
+
+                    <Input
+                      {...register("zipCode", {
+                        required: "Zip Code is required",
+                      })}
+                      className={inputStyle}
+                      placeholder="400050"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
                   <label className={labelStyle}>Features & Amenities</label>
-                  <p className="text-white/20 text-[10px] mb-3">Add amenities and features (press Enter to add)</p>
+
+                  <p className="text-white/20 text-[10px] mb-3">
+                    Add amenities and features. Press Enter to add.
+                  </p>
+
                   <Controller
                     name="features"
                     control={control}
@@ -511,75 +662,158 @@ export default function EditProperty() {
 
           <Separator className="bg-white/5" />
 
-          {/* Section 2: Existing Media */}
-          {existingMedia.length > 0 && (
-            <section>
-              <h2 className={sectionHeading}>
-                <Upload className="w-5 h-5 text-amber-500" /> Current Media
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {existingMedia.map((media, i) => (
-                  <div key={media.media_id} className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5">
-                    <img
-                      src={media.url}
-                      alt={`Property media ${i + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeExistingMedia(media.media_id)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Section 3: New Media Upload */}
           <section>
             <h2 className={sectionHeading}>
-              <Upload className="w-5 h-5 text-amber-500" /> Add New Media
+              <Upload className="w-5 h-5 text-amber-500" />
+              Property Media
             </h2>
-            
-            <input 
-              type="file" 
-              multiple 
+
+            <p className="text-white/30 text-xs mb-6">
+              You can keep, remove, or add property images/videos. The final
+              media shown below will be submitted for admin approval.
+            </p>
+
+            {existingMedia.length > 0 && (
+              <div className="mb-10">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-4">
+                  Current Media
+                </p>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {existingMedia.map((media, i) => {
+                    const isVideo =
+                      media.media_type?.startsWith("video") ||
+                      media.url?.includes(".mp4");
+
+                    return (
+                      <div
+                        key={media.media_id || media.url || i}
+                        className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5"
+                      >
+                        {isVideo ? (
+                          <video
+                            src={media.url}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={media.url}
+                            alt={`Property media ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-1 text-[9px] text-white/70">
+                          {isVideo ? (
+                            <Video className="w-3 h-3" />
+                          ) : (
+                            <ImageIcon className="w-3 h-3" />
+                          )}
+                          Existing
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeExistingMedia(media.media_id)}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <input
+              type="file"
+              multiple
               accept="image/*,video/*"
-              className="hidden" 
+              className="hidden"
               ref={fileInputRef}
               onChange={handleFileChange}
             />
-            
-            <div 
+
+            <div
               onClick={() => fileInputRef.current?.click()}
               className="group border-2 border-dashed border-white/10 rounded-[32px] p-16 text-center hover:border-amber-500/50 hover:bg-white/[0.02] transition-all cursor-pointer relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+
               <Upload className="w-12 h-12 text-white/20 mx-auto mb-6 group-hover:text-amber-500 group-hover:scale-110 transition-all duration-500" />
-              <p className="text-white font-serif text-lg italic group-hover:text-white transition-colors">Click to upload additional photos</p>
-              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">High-resolution JPEG's and Videos MAX 30 MB</p>
+
+              <p className="text-white font-serif text-lg italic group-hover:text-white transition-colors">
+                Click to upload additional media
+              </p>
+
+              <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest mt-3">
+                Images and videos. Maximum 15 total files. Maximum 30 MB each.
+              </p>
             </div>
 
             {files.length > 0 && (
-              <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {files.map((file, i) => (
-                  <div key={i} className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5">
-                    <div className="absolute inset-0 p-4 flex flex-col items-center justify-center text-center break-all">
-                      <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest line-clamp-2">{file.name}</p>
-                      <p className="text-[9px] text-white/40 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+              <div className="mt-8">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-4">
+                  New Media
+                </p>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {files.map((file, i) => {
+                    const isVideo = file.type.startsWith("video/");
+
+                    return (
+                      <div
+                        key={`${file.name}-${i}`}
+                        className="relative rounded-xl overflow-hidden aspect-square border border-white/10 group bg-white/5"
+                      >
+                        {isVideo ? (
+                          <video
+                            src={URL.createObjectURL(file)}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+
+                        <div className="absolute inset-x-0 bottom-0 bg-black/70 p-2">
+                          <p className="text-[9px] text-amber-500 font-bold uppercase tracking-widest line-clamp-1">
+                            {file.name}
+                          </p>
+
+                          <p className="text-[9px] text-white/40 mt-1">
+                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => removeFile(i)}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {existingMedia.length === 0 && files.length === 0 && (
+              <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
+                <p className="text-red-300 text-xs">
+                  No media selected. Submitting now will remove all images from
+                  this property after admin approval.
+                </p>
               </div>
             )}
           </section>
@@ -591,16 +825,19 @@ export default function EditProperty() {
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" /> Submitting Edit Request...
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Submitting Edit Request...
               </span>
-            ) : "Submit Edit for Approval"}
+            ) : (
+              "Submit Edit for Approval"
+            )}
           </Button>
         </motion.form>
 
         <div className="mt-16 text-center">
           <p className="text-white/20 text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2">
             <Sparkles className="w-3 h-3 text-amber-500" />
-            Your property will be hidden until the edit is approved
+            Your changes will go live only after admin approval
           </p>
         </div>
       </div>

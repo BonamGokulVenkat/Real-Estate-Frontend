@@ -18,9 +18,17 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  X,
+  MapPin,
+  Bed,
+  Bath,
+  Maximize,
+  User as UserIcon,
+  Calendar,
 } from "lucide-react";
 import PropertyCard from "@/components/common/PropertyCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/store/useAuthStore";
 import { favouriteService } from "@/services/favouriteService";
 import { propertyService, Property } from "@/services/propertyService";
@@ -49,6 +57,7 @@ export default function Profile() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
   const { formatPrice, getConvertedPrice } = useCurrency();
@@ -101,6 +110,14 @@ export default function Profile() {
 
   const saved = favorites?.map((f: any) => f.property) || [];
   const listed = myProperties || [];
+
+  const previewProperty = listed.find(
+    (property: Property) => property.property_id === previewId
+  );
+
+  const previewImage =
+    previewProperty?.media?.[0]?.url ||
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9";
 
   const getNumericPrice = (price: string) => {
     const num = Number(price);
@@ -171,6 +188,23 @@ export default function Profile() {
       icon: AlertTriangle,
       text: status,
     };
+  };
+
+  const getStatusBadgeClass = (status?: string) => {
+    switch (status) {
+      case "available":
+        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      case "pending":
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+      case "edit_pending":
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      case "delete_pending":
+        return "bg-orange-500/10 text-orange-400 border-orange-500/20";
+      case "rejected":
+        return "bg-red-500/10 text-red-400 border-red-500/20";
+      default:
+        return "bg-white/5 text-white/50 border-white/10";
+    }
   };
 
   return (
@@ -497,11 +531,21 @@ export default function Profile() {
                   const isFrozen = p.status !== "available";
 
                   return (
-                    <div key={p.property_id} className="relative group">
+                    <div
+                      key={p.property_id}
+                      onClick={() => {
+                        if (isFrozen) {
+                          setPreviewId(p.property_id);
+                        }
+                      }}
+                      className={`relative group ${
+                        isFrozen ? "cursor-pointer" : ""
+                      }`}
+                    >
                       <div
                         className={
                           isFrozen
-                            ? "pointer-events-none select-none grayscale cursor-not-allowed"
+                            ? "pointer-events-none select-none grayscale"
                             : ""
                         }
                       >
@@ -509,7 +553,7 @@ export default function Profile() {
                       </div>
 
                       {isFrozen && (
-                        <div className="absolute inset-0 z-10 rounded-[inherit] bg-black/30 backdrop-grayscale pointer-events-none cursor-not-allowed" />
+                        <div className="absolute inset-0 z-10 rounded-[inherit] bg-black/30 backdrop-grayscale pointer-events-none" />
                       )}
 
                       <div className="absolute top-4 left-4 z-20">
@@ -524,7 +568,7 @@ export default function Profile() {
                       </div>
 
                       {p.status === "available" && (
-                        <div className="absolute top-4 right-75 z-30">
+                        <div className="absolute top-4 right-4 z-30">
                           <button
                             onClick={(e) => {
                               e.preventDefault();
@@ -625,6 +669,234 @@ export default function Profile() {
           </motion.section>
         )}
       </div>
+
+      {/* Property Preview Modal */}
+      {previewProperty && (
+        <div
+          onClick={() => setPreviewId(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 bg-black/70 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[32px] bg-[#0D2137] border border-white/10 text-white shadow-2xl"
+          >
+            <button
+              onClick={() => setPreviewId(null)}
+              className="absolute top-5 right-5 z-20 h-10 w-10 rounded-full bg-black/40 hover:bg-white/10 border border-white/10 flex items-center justify-center"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative h-[280px] md:h-[380px] overflow-hidden rounded-t-[32px] bg-[#0A192F]">
+              <img
+                src={previewImage}
+                alt={previewProperty.title}
+                className="w-full h-full object-cover"
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0D2137] via-[#0D2137]/20 to-transparent" />
+
+              <div className="absolute bottom-8 left-8 right-8">
+                <Badge
+                  className={`${getStatusBadgeClass(
+                    previewProperty.status
+                  )} border rounded-full px-4 py-1.5 uppercase tracking-widest text-[10px] font-bold mb-4`}
+                >
+                  {previewProperty.status?.replace("_", " ")}
+                </Badge>
+
+                <h2 className="text-3xl md:text-5xl font-serif font-bold leading-tight">
+                  {previewProperty.title}
+                </h2>
+
+                <p className="flex items-center gap-2 mt-3 text-white/60 text-sm">
+                  <MapPin className="w-4 h-4 text-amber-500" />
+                  {[
+                    previewProperty.location?.address,
+                    previewProperty.location?.city,
+                    previewProperty.location?.state,
+                    previewProperty.location?.country,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "Location not available"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Home className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Type
+                  </p>
+                  <p className="text-sm font-semibold text-white capitalize mt-1">
+                    {previewProperty.property_type || "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Bed className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Bedrooms
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.bedrooms ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Bath className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Bathrooms
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.bathrooms ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Maximize className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Area
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.size_sqft
+                      ? `${previewProperty.size_sqft} sqft`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                      Description
+                    </p>
+                    <p className="text-white/60 leading-relaxed text-sm">
+                      {previewProperty.description || "No description provided."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                      Features
+                    </p>
+
+                    {previewProperty.features?.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {previewProperty.features.map((feature) => (
+                          <span
+                            key={feature}
+                            className="rounded-full bg-white/[0.04] border border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-white/60"
+                          >
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/35">No features added.</p>
+                    )}
+                  </div>
+
+                  {previewProperty.media?.length ? (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                        Media
+                      </p>
+
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                        {previewProperty.media.map((media: any) => (
+                          <div
+                            key={media.media_id || media.url}
+                            className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]"
+                          >
+                            <img
+                              src={media.url}
+                              alt={previewProperty.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[28px] bg-white/[0.03] border border-white/10 p-6 h-fit space-y-6">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold mb-2">
+                      Price
+                    </p>
+                    <p className="text-3xl font-serif font-bold text-amber-500">
+                      {formatPrice(previewProperty.price)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    <div className="flex items-center gap-3 text-white/60">
+                      <UserIcon className="w-4 h-4 text-amber-500" />
+                      <span>
+                        {previewProperty.builder?.name || "Private Seller"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-white/60">
+                      <Calendar className="w-4 h-4 text-amber-500" />
+                      <span>
+                        {previewProperty.date_added
+                          ? new Date(previewProperty.date_added).toLocaleDateString()
+                          : "Date not available"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/10">
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-center ${getStatusBadgeClass(
+                        previewProperty.status
+                      )}`}
+                    >
+                      <p className="text-[9px] font-bold uppercase tracking-widest">
+                        Current Status
+                      </p>
+                      <p className="text-sm font-semibold capitalize mt-1">
+                        {previewProperty.status?.replace("_", " ")}
+                      </p>
+                    </div>
+
+                    {previewProperty.status === "pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        This listing is waiting for admin approval. It is not visible
+                        publicly yet.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "edit_pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        Your edit request is waiting for admin approval.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "delete_pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        Your deletion request is waiting for admin approval.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "rejected" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        This listing was rejected by admin.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog
