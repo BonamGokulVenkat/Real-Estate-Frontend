@@ -3,11 +3,32 @@
 
 import { motion } from "framer-motion";
 import {
-  Heart, Home, Edit, ShieldCheck, Loader2, ArrowUpRight,
-  Phone, Mail, Building2, Sparkles, MapPin, Star, Clock, AlertTriangle, CheckCircle, XCircle
+  Heart,
+  Home,
+  Edit,
+  ShieldCheck,
+  Loader2,
+  ArrowUpRight,
+  Phone,
+  Mail,
+  Building2,
+  Sparkles,
+  Star,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  X,
+  MapPin,
+  Bed,
+  Bath,
+  Maximize,
+  User as UserIcon,
+  Calendar,
 } from "lucide-react";
 import PropertyCard from "@/components/common/PropertyCard";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/store/useAuthStore";
 import { favouriteService } from "@/services/favouriteService";
 import { propertyService, Property } from "@/services/propertyService";
@@ -32,15 +53,15 @@ import {
 export default function Profile() {
   const { user, isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
+
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null);
-  const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+
   const queryClient = useQueryClient();
   const { formatPrice, getConvertedPrice } = useCurrency();
 
-  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
-  // These hooks will always be called in the same order
   const { data: favorites = [], isLoading: loadingFavs } = useQuery({
     queryKey: ["favorites"],
     queryFn: favouriteService.getFavorites,
@@ -54,7 +75,7 @@ export default function Profile() {
   });
 
   const deleteRequestMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) => 
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       propertyService.requestDelete(id, reason),
     onSuccess: () => {
       toast.success("Deletion request submitted. Awaiting admin approval.");
@@ -67,15 +88,14 @@ export default function Profile() {
     },
   });
 
-  // ✅ useEffect is also a hook, must be called unconditionally
   useEffect(() => {
     if (!isHydrated) return;
+
     if (!isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated,isHydrated, router]);
+  }, [isAuthenticated, isHydrated, router]);
 
-  // ✅ Now we can have conditional returns AFTER all hooks
   if (!isHydrated || (!isAuthenticated && !user)) {
     return (
       <div className="min-h-screen pt-32 flex justify-center bg-[#0A192F]">
@@ -88,45 +108,103 @@ export default function Profile() {
     return null;
   }
 
-  // Helper functions (not hooks, so these are fine after returns)
   const saved = favorites?.map((f: any) => f.property) || [];
   const listed = myProperties || [];
-  
+
+  const previewProperty = listed.find(
+    (property: Property) => property.property_id === previewId
+  );
+
+  const previewImage =
+    previewProperty?.media?.[0]?.url ||
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9";
+
   const getNumericPrice = (price: string) => {
     const num = Number(price);
     return isNaN(num) ? 0 : num;
   };
-  
+
   const totalValue = listed.reduce(
     (sum, p) => sum + getConvertedPrice(getNumericPrice(p.price)),
     0
   );
-  
-  const experienceYears = user.date_joined 
+
+  const experienceYears = user.date_joined
     ? new Date().getFullYear() - new Date(user.date_joined).getFullYear()
     : 0;
 
   const initials = user.name
-    ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? user.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "U";
 
   const getStatusBadge = (status: string, pendingAction?: string) => {
     if (status === "edit_pending") {
-      return { color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: Clock, text: "Edit Pending" };
+      return {
+        color: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+        icon: Clock,
+        text: "Edit Pending",
+      };
     }
+
     if (status === "delete_pending") {
-      return { color: "bg-orange-500/20 text-orange-400 border-orange-500/30", icon: AlertTriangle, text: "Delete Pending" };
+      return {
+        color: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+        icon: AlertTriangle,
+        text: "Delete Pending",
+      };
     }
+
     if (status === "pending") {
-      return { color: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: Clock, text: "Pending Approval" };
+      return {
+        color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+        icon: Clock,
+        text: "Pending Approval",
+      };
     }
+
     if (status === "available") {
-      return { color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30", icon: CheckCircle, text: "Live" };
+      return {
+        color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+        icon: CheckCircle,
+        text: "Live",
+      };
     }
+
     if (status === "rejected") {
-      return { color: "bg-red-500/20 text-red-400 border-red-500/30", icon: XCircle, text: "Rejected" };
+      return {
+        color: "bg-red-500/20 text-red-400 border-red-500/30",
+        icon: XCircle,
+        text: "Rejected",
+      };
     }
-    return { color: "bg-white/10 text-white/40 border-white/10", icon: AlertTriangle, text: status };
+
+    return {
+      color: "bg-white/10 text-white/40 border-white/10",
+      icon: AlertTriangle,
+      text: status,
+    };
+  };
+
+  const getStatusBadgeClass = (status?: string) => {
+    switch (status) {
+      case "available":
+        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+      case "pending":
+        return "bg-amber-500/10 text-amber-400 border-amber-500/20";
+      case "edit_pending":
+        return "bg-blue-500/10 text-blue-400 border-blue-500/20";
+      case "delete_pending":
+        return "bg-orange-500/10 text-orange-400 border-orange-500/20";
+      case "rejected":
+        return "bg-red-500/10 text-red-400 border-red-500/20";
+      default:
+        return "bg-white/5 text-white/50 border-white/10";
+    }
   };
 
   return (
@@ -148,11 +226,18 @@ export default function Profile() {
               <div className="relative shrink-0">
                 <div className="w-28 h-28 lg:w-36 lg:h-36 rounded-[28px] overflow-hidden border-2 border-white/10 bg-[#0D2137] flex items-center justify-center shadow-2xl">
                   {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+                    <img
+                      src={user.avatar_url}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
-                    <span className="font-serif font-bold text-4xl text-amber-500">{initials}</span>
+                    <span className="font-serif font-bold text-4xl text-amber-500">
+                      {initials}
+                    </span>
                   )}
                 </div>
+
                 <div className="absolute -bottom-2 -right-2 bg-amber-500 p-1.5 rounded-xl shadow-lg">
                   <ShieldCheck className="w-4 h-4 text-[#0A192F]" />
                 </div>
@@ -163,10 +248,12 @@ export default function Profile() {
                   <h1 className="font-serif text-4xl lg:text-5xl font-bold tracking-tight text-white">
                     {user.name}
                   </h1>
+
                   <div className="flex items-center gap-2 justify-center md:justify-start">
                     <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-500 text-[9px] font-bold uppercase tracking-[0.3em] rounded-full">
                       {user.role}
                     </span>
+
                     {user.role === "builder" && (
                       <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-bold uppercase tracking-[0.3em] rounded-full flex items-center gap-1">
                         <Star className="w-2.5 h-2.5 fill-emerald-400" />
@@ -181,12 +268,14 @@ export default function Profile() {
                     <Mail className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
                     {user.email}
                   </span>
+
                   {user.phone && (
                     <span className="flex items-center gap-2 text-white/40 text-sm">
                       <Phone className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
                       {user.phone}
                     </span>
                   )}
+
                   {user.role === "builder" && user.company_name && (
                     <span className="flex items-center gap-2 text-white/40 text-sm">
                       <Building2 className="w-3.5 h-3.5 text-amber-500/60 shrink-0" />
@@ -201,18 +290,36 @@ export default function Profile() {
                   </p>
                 )}
 
-                {user.role === "builder" && user.specializations && user.specializations.length > 0 && (
-                  <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                    {user.specializations.map((s) => (
-                      <span key={s} className="px-3 py-1 bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold uppercase tracking-wider rounded-full">
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                {user.role === "builder" &&
+                  user.specializations &&
+                  user.specializations.length > 0 && (
+                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                      {user.specializations.map((s) => (
+                        <span
+                          key={s}
+                          className="px-3 py-1 bg-white/5 border border-white/10 text-white/50 text-[10px] font-bold uppercase tracking-wider rounded-full"
+                        >
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
               </div>
 
-              <div className="shrink-0">
+              {/* Profile Actions */}
+              <div className="shrink-0 flex flex-col sm:flex-row gap-3">
+                {user.role === "admin" && (
+                  <Link href="/admin">
+                    <Button
+                      variant="outline"
+                      className="border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 hover:border-amber-500/60 rounded-2xl gap-2 text-[10px] font-bold uppercase tracking-widest text-amber-400 transition-all"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      Admin Dashboard
+                    </Button>
+                  </Link>
+                )}
+
                 <Button
                   onClick={() => setIsEditOpen(true)}
                   variant="outline"
@@ -242,11 +349,17 @@ export default function Profile() {
                 <div className="w-10 h-10 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center">
                   <Building2 className="w-5 h-5 text-amber-500" />
                 </div>
+
                 <div>
-                  <p className="text-white font-semibold text-sm">View Your Public Agency Profile</p>
-                  <p className="text-white/30 text-xs">See how clients view your listings and profile</p>
+                  <p className="text-white font-semibold text-sm">
+                    View Your Public Agency Profile
+                  </p>
+                  <p className="text-white/30 text-xs">
+                    See how clients view your listings and profile
+                  </p>
                 </div>
               </div>
+
               <ArrowUpRight className="w-5 h-5 text-amber-500/60 group-hover:text-amber-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
             </Link>
           </motion.div>
@@ -257,16 +370,26 @@ export default function Profile() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className={`grid gap-6 mb-12 ${user.role === "builder" ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2"}`}
+          className={`grid gap-6 mb-12 ${
+            user.role === "builder" ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2"
+          }`}
         >
           <div className="bg-white/[0.02] border border-white/10 rounded-[28px] p-7 text-center group hover:border-amber-500/30 transition-all duration-500">
             <div className="w-11 h-11 bg-[#0D2137] rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/5 group-hover:scale-110 transition-transform">
               <Heart className="w-5 h-5 text-amber-500" />
             </div>
+
             <div className="font-serif text-3xl font-bold text-white mb-1 tabular-nums">
-              {loadingFavs ? <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" /> : saved.length}
+              {loadingFavs ? (
+                <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" />
+              ) : (
+                saved.length
+              )}
             </div>
-            <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">Saved Estates</div>
+
+            <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">
+              Saved Estates
+            </div>
           </div>
 
           {user.role === "builder" && (
@@ -275,30 +398,50 @@ export default function Profile() {
                 <div className="w-11 h-11 bg-[#0D2137] rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/5 group-hover:scale-110 transition-transform">
                   <Home className="w-5 h-5 text-amber-500" />
                 </div>
+
                 <div className="font-serif text-3xl font-bold text-white mb-1 tabular-nums">
-                  {loadingProps ? <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" /> : listed.length}
+                  {loadingProps ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" />
+                  ) : (
+                    listed.length
+                  )}
                 </div>
-                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">Your Listings</div>
+
+                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">
+                  Your Listings
+                </div>
               </div>
 
               <div className="bg-white/[0.02] border border-white/10 rounded-[28px] p-7 text-center group hover:border-amber-500/30 transition-all duration-500">
                 <div className="w-11 h-11 bg-[#0D2137] rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/5 group-hover:scale-110 transition-transform">
                   <Sparkles className="w-5 h-5 text-amber-500" />
                 </div>
+
                 <div className="font-serif text-3xl font-bold text-white mb-1 tabular-nums">
-                  {loadingProps ? <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" /> : formatPrice(totalValue)}
+                  {loadingProps ? (
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-amber-500" />
+                  ) : (
+                    formatPrice(totalValue)
+                  )}
                 </div>
-                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">Portfolio Value</div>
+
+                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">
+                  Portfolio Value
+                </div>
               </div>
 
               <div className="bg-white/[0.02] border border-white/10 rounded-[28px] p-7 text-center group hover:border-amber-500/30 transition-all duration-500">
                 <div className="w-11 h-11 bg-[#0D2137] rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/5 group-hover:scale-110 transition-transform">
                   <ShieldCheck className="w-5 h-5 text-amber-500" />
                 </div>
+
                 <div className="font-serif text-3xl font-bold text-white mb-1 tabular-nums">
                   {experienceYears > 0 ? `${experienceYears}y` : "<1y"}
                 </div>
-                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">Experience</div>
+
+                <div className="text-[9px] uppercase font-bold tracking-[0.25em] text-white/20">
+                  Experience
+                </div>
               </div>
             </>
           )}
@@ -313,9 +456,14 @@ export default function Profile() {
         >
           <div className="flex items-end justify-between mb-10 border-b border-white/5 pb-6">
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-500/60 mb-1">Collection</p>
-              <h2 className="font-serif text-3xl font-bold text-white/80">Saved Estates</h2>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-500/60 mb-1">
+                Collection
+              </p>
+              <h2 className="font-serif text-3xl font-bold text-white/80">
+                Saved Estates
+              </h2>
             </div>
+
             <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">
               {saved.length} properties
             </span>
@@ -334,8 +482,12 @@ export default function Profile() {
           ) : (
             <div className="py-24 text-center bg-white/[0.01] rounded-[40px] border border-dashed border-white/10">
               <Heart className="w-10 h-10 text-white/10 mx-auto mb-4" />
-              <p className="text-white/30 font-serif italic text-lg">Your curated collection is empty.</p>
-              <p className="text-white/20 text-sm mt-2">Browse properties and save the ones you love.</p>
+              <p className="text-white/30 font-serif italic text-lg">
+                Your curated collection is empty.
+              </p>
+              <p className="text-white/20 text-sm mt-2">
+                Browse properties and save the ones you love.
+              </p>
             </div>
           )}
         </motion.section>
@@ -350,9 +502,14 @@ export default function Profile() {
           >
             <div className="flex items-end justify-between mb-10 border-b border-white/5 pb-6">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-500/60 mb-1">Portfolio</p>
-                <h2 className="font-serif text-3xl font-bold text-white/80">Your Listings</h2>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-500/60 mb-1">
+                  Portfolio
+                </p>
+                <h2 className="font-serif text-3xl font-bold text-white/80">
+                  Your Listings
+                </h2>
               </div>
+
               <Link
                 href="/sell"
                 className="text-[10px] font-bold uppercase tracking-widest text-amber-500/60 hover:text-amber-500 transition-colors"
@@ -367,124 +524,141 @@ export default function Profile() {
               </div>
             ) : listed.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {listed.map((p: Property, i: number) => {
-              const statusBadge = getStatusBadge(p.status, p.pending_action);
-              const StatusIcon = statusBadge.icon;
-              const isMenuOpen = openMenuId === p.property_id;
-              const isFrozen = p.status !== "available"; // Only "available" properties can be edited or deleted
+                {listed.map((p: Property, i: number) => {
+                  const statusBadge = getStatusBadge(p.status, p.pending_action);
+                  const StatusIcon = statusBadge.icon;
+                  const isMenuOpen = openMenuId === p.property_id;
+                  const isFrozen = p.status !== "available";
 
-              return (
-                <div key={p.property_id} className="relative group">
-                  
-                {/* Pointer-events block on the card itself */}
-                  <div className={isFrozen ? "pointer-events-none select-none grayscale cursor-not-allowed" : ""}>
-                    <PropertyCard property={p} index={i} />
-                  </div>
-                  {/* Grayscale + freeze overlay */}
-                  {isFrozen && (
-                    <div className="absolute inset-0 z-10 rounded-[inherit] bg-black/30 backdrop-grayscale pointer-events-none cursor-not-allowed" />
-                  )}
-
-                  
-                  {/* Status badge */}
-                  <div className="absolute top-4 left-4 z-20">
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}>
-                      <StatusIcon className="w-3 h-3" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{statusBadge.text}</span>
-                    </div>
-                  </div>
-
-
-                  {/* Three-dot menu — only for available properties */}
-                  {p.status === "available" && (
-                    <div className="absolute top-4 right-75 z-30">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setOpenMenuId(isMenuOpen ? null : p.property_id);
-                        }}
-                        className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-white/40 transition-all"
+                  return (
+                    <div
+                      key={p.property_id}
+                      onClick={() => {
+                        if (isFrozen) {
+                          setPreviewId(p.property_id);
+                        }
+                      }}
+                      className={`relative group ${
+                        isFrozen ? "cursor-pointer" : ""
+                      }`}
+                    >
+                      <div
+                        className={
+                          isFrozen
+                            ? "pointer-events-none select-none grayscale"
+                            : ""
+                        }
                       >
-                        <span className="flex flex-col gap-[3px] items-center justify-center">
-                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
-                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
-                          <span className="w-[3px] h-[3px] rounded-full bg-white block" />
-                        </span>
-                      </button>
+                        <PropertyCard property={p} index={i} />
+                      </div>
 
-                      {isMenuOpen && (
-                        <>
-                          {/* Backdrop to close menu */}
-                          <div
-                            className="fixed inset-0 z-20"
-                            onClick={() => setOpenMenuId(null)}
-                          />
-                          <div className="absolute top-10 right-0 z-30 bg-[#0D2137] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
-                            <Link
-                              href={`/edit-property/${p.property_id}`}
-                              className="flex items-center gap-2.5 px-4 py-3 text-white/70 hover:bg-white/5 hover:text-amber-400 transition-colors text-xs font-semibold"
-                              onClick={() => setOpenMenuId(null)}
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                              Edit
-                            </Link>
-                            <button
-                              onClick={() => {
-                                setOpenMenuId(null);
-                                setPropertyToDelete(p);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-xs font-semibold border-t border-white/5"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              Delete
-                            </button>
-                          </div>
-                        </>
+                      {isFrozen && (
+                        <div className="absolute inset-0 z-10 rounded-[inherit] bg-black/30 backdrop-grayscale pointer-events-none" />
+                      )}
+
+                      <div className="absolute top-4 left-4 z-20">
+                        <div
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${statusBadge.color} backdrop-blur-sm`}
+                        >
+                          <StatusIcon className="w-3 h-3" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">
+                            {statusBadge.text}
+                          </span>
+                        </div>
+                      </div>
+
+                      {p.status === "available" && (
+                        <div className="absolute top-4 right-4 z-30">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenMenuId(isMenuOpen ? null : p.property_id);
+                            }}
+                            className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-black/80 hover:border-white/40 transition-all"
+                          >
+                            <span className="flex flex-col gap-[3px] items-center justify-center">
+                              <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                              <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                              <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                            </span>
+                          </button>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-20"
+                                onClick={() => setOpenMenuId(null)}
+                              />
+
+                              <div className="absolute top-10 right-0 z-30 bg-[#0D2137] border border-white/10 rounded-2xl shadow-2xl overflow-hidden min-w-[140px]">
+                                <Link
+                                  href={`/edit-property/${p.property_id}`}
+                                  className="flex items-center gap-2.5 px-4 py-3 text-white/70 hover:bg-white/5 hover:text-amber-400 transition-colors text-xs font-semibold"
+                                  onClick={() => setOpenMenuId(null)}
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                  Edit
+                                </Link>
+
+                                <button
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    setPropertyToDelete(p);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-4 py-3 text-red-400 hover:bg-red-500/10 transition-colors text-xs font-semibold border-t border-white/5"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {p.status === "edit_pending" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-blue-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">
+                            Awaiting admin approval for edits
+                          </p>
+                        </div>
+                      )}
+
+                      {p.status === "delete_pending" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-orange-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-orange-400 text-[9px] font-bold uppercase tracking-wider">
+                            Deletion request pending admin approval
+                          </p>
+                        </div>
+                      )}
+
+                      {p.status === "pending" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-amber-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">
+                            Awaiting admin approval
+                          </p>
+                        </div>
+                      )}
+
+                      {p.status === "rejected" && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 bg-red-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
+                          <p className="text-red-400 text-[9px] font-bold uppercase tracking-wider">
+                            Listing rejected by admin
+                          </p>
+                        </div>
                       )}
                     </div>
-                  )}
-
-                  {p.status === "edit_pending" && (
-                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-blue-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                      <p className="text-blue-400 text-[9px] font-bold uppercase tracking-wider">
-                        Awaiting admin approval for edits
-                      </p>
-                    </div>
-                  )}
-
-                  {p.status === "delete_pending" && (
-                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-orange-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                      <p className="text-orange-400 text-[9px] font-bold uppercase tracking-wider">
-                        Deletion request pending admin approval
-                      </p>
-                    </div>
-                  )}
-
-                  {p.status === "pending" && (
-                    <div className="absolute bottom-4 left-4 right-4 z-20 bg-amber-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                      <p className="text-amber-400 text-[9px] font-bold uppercase tracking-wider">
-                        Awaiting admin approval
-                      </p>
-                    </div>
-                  )}
-
-
-                  {p.status === "rejected" && (
-                  <div className="absolute bottom-4 left-4 right-4 z-20 bg-red-500/20 backdrop-blur-sm rounded-xl p-2 text-center">
-                    <p className="text-red-400 text-[9px] font-bold uppercase tracking-wider">
-                      Listing rejected by admin
-                    </p>
-                  </div>
-                )}
-                </div>
-              );
-            })}
+                  );
+                })}
               </div>
             ) : (
               <div className="py-24 text-center bg-white/[0.01] rounded-[40px] border border-dashed border-white/10">
                 <Home className="w-10 h-10 text-white/10 mx-auto mb-4" />
-                <p className="text-white/30 font-serif italic text-lg">No listings yet.</p>
+                <p className="text-white/30 font-serif italic text-lg">
+                  No listings yet.
+                </p>
+
                 <Link href="/sell">
                   <Button className="mt-6 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-xl font-bold text-[10px] uppercase tracking-widest h-11 px-8">
                     List Your First Property
@@ -496,23 +670,265 @@ export default function Profile() {
         )}
       </div>
 
+      {/* Property Preview Modal */}
+      {previewProperty && (
+        <div
+          onClick={() => setPreviewId(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 bg-black/70 backdrop-blur-sm"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[32px] bg-[#0D2137] border border-white/10 text-white shadow-2xl"
+          >
+            <button
+              onClick={() => setPreviewId(null)}
+              className="absolute top-5 right-5 z-20 h-10 w-10 rounded-full bg-black/40 hover:bg-white/10 border border-white/10 flex items-center justify-center"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="relative h-[280px] md:h-[380px] overflow-hidden rounded-t-[32px] bg-[#0A192F]">
+              <img
+                src={previewImage}
+                alt={previewProperty.title}
+                className="w-full h-full object-cover"
+              />
+
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0D2137] via-[#0D2137]/20 to-transparent" />
+
+              <div className="absolute bottom-8 left-8 right-8">
+                <Badge
+                  className={`${getStatusBadgeClass(
+                    previewProperty.status
+                  )} border rounded-full px-4 py-1.5 uppercase tracking-widest text-[10px] font-bold mb-4`}
+                >
+                  {previewProperty.status?.replace("_", " ")}
+                </Badge>
+
+                <h2 className="text-3xl md:text-5xl font-serif font-bold leading-tight">
+                  {previewProperty.title}
+                </h2>
+
+                <p className="flex items-center gap-2 mt-3 text-white/60 text-sm">
+                  <MapPin className="w-4 h-4 text-amber-500" />
+                  {[
+                    previewProperty.location?.address,
+                    previewProperty.location?.city,
+                    previewProperty.location?.state,
+                    previewProperty.location?.country,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "Location not available"}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8 space-y-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Home className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Type
+                  </p>
+                  <p className="text-sm font-semibold text-white capitalize mt-1">
+                    {previewProperty.property_type || "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Bed className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Bedrooms
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.bedrooms ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Bath className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Bathrooms
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.bathrooms ?? "—"}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-5">
+                  <Maximize className="w-4 h-4 text-amber-500 mb-3" />
+                  <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold">
+                    Area
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {previewProperty.size_sqft
+                      ? `${previewProperty.size_sqft} sqft`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                      Description
+                    </p>
+                    <p className="text-white/60 leading-relaxed text-sm">
+                      {previewProperty.description || "No description provided."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                      Features
+                    </p>
+
+                    {previewProperty.features?.length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {previewProperty.features.map((feature) => (
+                          <span
+                            key={feature}
+                            className="rounded-full bg-white/[0.04] border border-white/10 px-4 py-2 text-[10px] uppercase tracking-widest text-white/60"
+                          >
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/35">No features added.</p>
+                    )}
+                  </div>
+
+                  {previewProperty.media?.length ? (
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.3em] text-amber-500 font-bold mb-3">
+                        Media
+                      </p>
+
+                      <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
+                        {previewProperty.media.map((media: any) => (
+                          <div
+                            key={media.media_id || media.url}
+                            className="aspect-square rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]"
+                          >
+                            <img
+                              src={media.url}
+                              alt={previewProperty.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-[28px] bg-white/[0.03] border border-white/10 p-6 h-fit space-y-6">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-widest text-white/30 font-bold mb-2">
+                      Price
+                    </p>
+                    <p className="text-3xl font-serif font-bold text-amber-500">
+                      {formatPrice(previewProperty.price)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 text-sm">
+                    <div className="flex items-center gap-3 text-white/60">
+                      <UserIcon className="w-4 h-4 text-amber-500" />
+                      <span>
+                        {previewProperty.builder?.name || "Private Seller"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-white/60">
+                      <Calendar className="w-4 h-4 text-amber-500" />
+                      <span>
+                        {previewProperty.date_added
+                          ? new Date(previewProperty.date_added).toLocaleDateString()
+                          : "Date not available"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/10">
+                    <div
+                      className={`rounded-2xl border px-4 py-3 text-center ${getStatusBadgeClass(
+                        previewProperty.status
+                      )}`}
+                    >
+                      <p className="text-[9px] font-bold uppercase tracking-widest">
+                        Current Status
+                      </p>
+                      <p className="text-sm font-semibold capitalize mt-1">
+                        {previewProperty.status?.replace("_", " ")}
+                      </p>
+                    </div>
+
+                    {previewProperty.status === "pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        This listing is waiting for admin approval. It is not visible
+                        publicly yet.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "edit_pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        Your edit request is waiting for admin approval.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "delete_pending" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        Your deletion request is waiting for admin approval.
+                      </p>
+                    )}
+
+                    {previewProperty.status === "rejected" && (
+                      <p className="mt-3 text-xs text-white/40 leading-relaxed">
+                        This listing was rejected by admin.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!propertyToDelete} onOpenChange={() => setPropertyToDelete(null)}>
+      <AlertDialog
+        open={!!propertyToDelete}
+        onOpenChange={() => setPropertyToDelete(null)}
+      >
         <AlertDialogContent className="bg-[#0D2137] border border-white/10 text-white rounded-3xl max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-serif">Request Property Deletion?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-serif">
+              Request Property Deletion?
+            </AlertDialogTitle>
+
             <AlertDialogDescription className="text-white/50 text-sm leading-relaxed">
-              This will send a deletion request to the admin. Once approved, 
-              <span className="text-amber-400 font-semibold mx-1">{propertyToDelete?.title}</span>
+              This will send a deletion request to the admin. Once approved,
+              <span className="text-amber-400 font-semibold mx-1">
+                {propertyToDelete?.title}
+              </span>
               will be permanently removed from the platform.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
           <AlertDialogFooter className="gap-3 mt-2">
             <AlertDialogCancel className="bg-white/5 border-white/10 text-white hover:bg-white/10 rounded-xl px-6 h-11 flex-1">
               Cancel
             </AlertDialogCancel>
+
             <AlertDialogAction
-              onClick={() => deleteRequestMutation.mutate({ id: propertyToDelete?.property_id || "" })}
+              onClick={() =>
+                deleteRequestMutation.mutate({
+                  id: propertyToDelete?.property_id || "",
+                })
+              }
               disabled={deleteRequestMutation.isPending}
               className="bg-orange-500 hover:bg-orange-600 text-white border-none rounded-xl px-6 h-11 font-bold flex-1 disabled:opacity-60"
             >
@@ -526,7 +942,10 @@ export default function Profile() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <EditProfileModal isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} />
+      <EditProfileModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+      />
     </div>
   );
 }
