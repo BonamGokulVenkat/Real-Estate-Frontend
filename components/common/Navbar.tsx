@@ -1,16 +1,25 @@
 "use client";
 
-import React from "react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, User, Search, BadgeDollarSign, LayoutGrid, X, ChevronDown, LogOut } from "lucide-react";
+import {
+  Menu,
+  User,
+  Search,
+  BadgeDollarSign,
+  LayoutGrid,
+  X,
+  ChevronDown,
+  LogOut
+} from "lucide-react";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import Cookies from "js-cookie";
+
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { CurrencyCode } from "@/store/useCurrencyStore";
 import { useAuthStore } from "@/store/useAuthStore";
-import Cookies from "js-cookie";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -37,11 +46,11 @@ export default function Navbar() {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  
+
   const pathname = usePathname();
   const { currency, setCurrency } = useCurrency();
   const { user, isAuthenticated, logout } = useAuthStore();
-  
+
   const profileRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +64,7 @@ export default function Navbar() {
         setCurrencyDropdownOpen(false);
       }
     };
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -67,10 +76,10 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Check authentication on mount
+  // Check authentication on mount to prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
-    
+
     if (isAuthenticated && !Cookies.get("access_token")) {
       logout();
     }
@@ -86,9 +95,10 @@ export default function Navbar() {
   }, [logout]);
 
   const isLoggedIn = mounted && isAuthenticated && !!user && !!Cookies.get("access_token");
-  
+
   const visibleNavLinks = NAV_LINKS.filter((link) => {
     if (link.path === "/sell") {
+      // Hide "Sell Property" for individuals and admins, keep it for builders (and guests to prompt login)
       return user?.role !== "individual" && user?.role !== "admin";
     }
     return true;
@@ -123,14 +133,14 @@ export default function Navbar() {
         : "bg-transparent h-20 lg:h-24"
     )}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
-        
+
         {/* Mobile Menu Button */}
         <div className="lg:hidden">
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="text-white hover:bg-white/10 -ml-2"
                 aria-label="Open menu"
               >
@@ -230,7 +240,7 @@ export default function Navbar() {
                     </SheetClose>
                   </>
                 )}
-                
+
                 {/* Currency Selector */}
                 <div className="pt-4 mt-2 border-t border-white/10">
                   <div className="flex items-center justify-between px-2">
@@ -277,8 +287,8 @@ export default function Navbar() {
               href={link.path}
               className={cn(
                 "px-5 py-2 rounded-full text-sm font-medium transition-all duration-200",
-                pathname === link.path 
-                  ? "bg-amber-500 text-[#0A192F]" 
+                pathname === link.path
+                  ? "bg-amber-500 text-[#0A192F]"
                   : "text-white/70 hover:text-white hover:bg-white/10"
               )}
             >
@@ -289,14 +299,14 @@ export default function Navbar() {
 
         {/* Right Actions */}
         <div className="flex items-center gap-4">
-          {/* Mobile Profile */}
+          {/* Mobile Profile Icon (Visible only if logged in) */}
           <div className="lg:hidden">
             {isLoggedIn ? (
               <Link href="/profile">
                 <ProfileAvatar size="sm" />
               </Link>
             ) : (
-              <Link href="/login" className="text-white">
+              <Link href="/login" className="text-white hover:text-amber-500 transition-colors">
                 <User className="w-5 h-5" />
               </Link>
             )}
@@ -383,7 +393,7 @@ export default function Navbar() {
                 <Button asChild variant="ghost" className="text-white hover:bg-white/10 rounded-lg h-10">
                   <Link href="/login">Sign In</Link>
                 </Button>
-                <Button asChild className="bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-semibold rounded-lg h-10 px-5">
+                <Button asChild className="bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-semibold rounded-lg h-10 px-5 transition-transform active:scale-95">
                   <Link href="/signup">Sign Up</Link>
                 </Button>
               </div>
