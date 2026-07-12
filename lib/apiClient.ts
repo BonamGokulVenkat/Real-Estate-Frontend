@@ -1,4 +1,3 @@
-// lib/apiClient.ts
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
@@ -23,7 +22,10 @@ apiClient.interceptors.request.use(
 
 // Track if we're already refreshing to avoid infinite loops
 let isRefreshing = false;
-let failedQueue: { resolve: Function; reject: Function }[] = [];
+let failedQueue: {
+  resolve: (value: string | null) => void;
+  reject: (reason?: any) => void
+}[] = [];
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -39,7 +41,14 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Auth endpoints should NEVER trigger the refresh/redirect flow.
+    // A 401 here means "wrong credentials", not "session expired".
+    const isAuthEndpoint =
+      originalRequest?.url?.includes('/auth/login') ||
+      originalRequest?.url?.includes('/auth/register') ||
+      originalRequest?.url?.includes('/auth/refresh-token');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       // If already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
