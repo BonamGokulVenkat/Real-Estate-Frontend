@@ -59,9 +59,10 @@ export default function Login() {
       }
 
     } catch (error: any) {
-      const message =
-        error?.response?.data?.message ||
-        "Invalid email or password. Please try again.";
+      const raw = error?.response?.data?.message;
+      const message = Array.isArray(raw)
+        ? raw.join(" · ")
+        : raw || "Invalid email or password. Please try again.";
       setErrorMessage(message);
     } finally {
       setIsLoading(false);

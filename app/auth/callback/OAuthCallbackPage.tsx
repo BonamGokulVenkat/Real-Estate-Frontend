@@ -3,49 +3,57 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import Cookies from "js-cookie";
 import { useAuthStore, UserProfile } from "@/store/useAuthStore";
+import { apiClient } from "@/lib/apiClient";
 import { toast } from "sonner";
 
+/**
+ * After an OAuth login, the backend sets HttpOnly cookies and redirects here
+ * with only a ?role= query param (non-sensitive, used only for routing).
+ *
+ * We then call GET /auth/me, which reads the HttpOnly cookie server-side,
+ * verifies the JWT, and returns the sanitized user profile.
+ */
 function CallbackLogic() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setUser = useAuthStore((state) => state.setUser);
 
   useEffect(() => {
-    const accessToken = searchParams.get("access_token");
-    const refreshToken = searchParams.get("refresh_token");
-    const userStr = searchParams.get("user");
+    const role = searchParams.get("role");
 
-    if (!accessToken || !userStr) {
-      toast.error("Authentication failed or missing token");
+    async function hydrateUser() {
+      try {
+        // The HttpOnly access_token cookie is sent automatically by the browser
+        // because apiClient has withCredentials: true.
+        const { data: user } = await apiClient.get<UserProfile>("/auth/me");
+
+        setUser(user);
+        toast.success("Logged in successfully!");
+
+        // Route based on role from the backend response (authoritative)
+        if (user.role === "admin") {
+          router.push("/admin");
+        } else if (user.role === "builder") {
+          router.push("/sell");
+        } else {
+          router.push("/");
+        }
+      } catch (err) {
+        console.error("OAuth callback — failed to fetch user profile:", err);
+        toast.error("Authentication failed. Please try again.");
+        router.push("/login");
+      }
+    }
+
+    // Guard: if there's no role param at all, something went wrong before redirect
+    if (!role) {
+      toast.error("Authentication failed or missing session");
       router.push("/login");
       return;
     }
 
-    try {
-      const user = JSON.parse(decodeURIComponent(userStr)) as UserProfile;
-
-      Cookies.set("access_token", accessToken);
-      if (refreshToken) {
-        Cookies.set("refresh_token", refreshToken);
-      }
-
-      setUser(user);
-      toast.success("Logged in successfully!");
-
-      if (user.role === "admin") {
-        router.push("/admin");
-      } else if (user.role === "builder") {
-        router.push("/sell");
-      } else {
-        router.push("/");
-      }
-    } catch (e) {
-      console.error("Failed to parse user data", e);
-      toast.error("Authentication data is corrupted");
-      router.push("/login");
-    }
+    hydrateUser();
   }, [router, searchParams, setUser]);
 
   return (
@@ -69,4 +77,3 @@ export default function OAuthCallbackPage() {
     </div>
   );
 }
-

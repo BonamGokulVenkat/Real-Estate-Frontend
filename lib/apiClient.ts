@@ -1,11 +1,14 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { useAuthStore } from '../store/useAuthStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const apiClient = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
+  // Ensures HttpOnly cookies are sent cross-origin on every request
+  withCredentials: true,
 });
 
 // Request interceptor — attach token
@@ -88,9 +91,11 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
 
-        // Refresh failed — clear cookies and redirect to login
+        // Refresh failed — clear cookies AND Zustand state so the UI
+        // doesn't show a "logged-in" ghost state after redirect.
         Cookies.remove('access_token');
         Cookies.remove('refresh_token');
+        useAuthStore.getState().logout();
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }

@@ -76,8 +76,10 @@ export default function Signup({ params }: PageProps) {
         router.push("/");
       }
     } catch (error: any) {
-      const message =
-        error.response?.data?.message || "Registration failed. Please try again.";
+      const raw = error?.response?.data?.message;
+      const message = Array.isArray(raw)
+        ? raw.join(" · ")
+        : raw || "Registration failed. Please try again.";
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
