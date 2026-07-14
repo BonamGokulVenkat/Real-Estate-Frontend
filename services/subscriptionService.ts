@@ -21,6 +21,11 @@ export const subscriptionService = {
     return response.data;
   },
 
+  async deletePlan(id: string) {
+    const response = await apiClient.delete(`/subscription/admin/plans/${id}`);
+    return response.data;
+  },
+
   async getSettings() {
     const response = await apiClient.get(`/subscription/admin/settings`);
     return response.data;
