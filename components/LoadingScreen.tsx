@@ -5,7 +5,7 @@ import { Sparkles } from "lucide-react";
 
 export default function LoadingScreen() {
     return (
-        <div className="min-h-screen bg-[#0A192F] flex flex-col items-center justify-center relative overflow-hidden selection:bg-amber-500/30">
+        <div className="fixed inset-0 z-50 bg-[#0A192F] flex flex-col items-center justify-center overflow-hidden selection:bg-amber-500/30">
             {/* Background Ambience (Matches your Auth pages) */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle_at_50%_50%,rgba(245,158,11,0.05)_0%,transparent_50%)] pointer-events-none" />
             <div className="absolute top-1/4 -right-24 w-96 h-96 bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
