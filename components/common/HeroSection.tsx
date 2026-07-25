@@ -165,7 +165,7 @@ export default function HeroSection() {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-white/60 text-lg md:text-xl max-w-xl mx-auto mb-12 font-light"
           >
-            Where Elegance Meets Modern Living
+            Trusted by a growing global network of family offices, private investors and wealth professionals.
           </motion.p>
 
           {/* Search Bar */}
