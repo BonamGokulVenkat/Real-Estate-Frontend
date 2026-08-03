@@ -119,10 +119,10 @@ export default function Signup({ params }: PageProps) {
               </span>
             </div>
             <h1 className="font-serif text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Create <span className="text-white/40 italic font-light">Legacy</span>
+              Showcase Your <span className="text-white/40 italic font-light">Legacy</span>
             </h1>
             <p className="text-white/30 text-sm font-light leading-relaxed">
-              Join our exclusive network of estates as a {roleDisplay.toLowerCase()}
+              Join Luxoria’s global network and present your developments to family offices, private investors and wealth professionals as a {roleDisplay.toLowerCase()}
             </p>
           </div>
 
@@ -159,7 +159,7 @@ export default function Signup({ params }: PageProps) {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
               <Input
                 type="text"
-                placeholder="Full Name"
+                placeholder="Company / Developer Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -200,7 +200,7 @@ export default function Signup({ params }: PageProps) {
                 <Loader2 className="w-5 h-5 animate-spin mx-auto" />
               ) : (
                 <>
-                  Establish Account <ArrowRight className="w-4 h-4 ml-2 inline" />
+                  CREATE BUILDER/DEVELOPER ACCOUNT <ArrowRight className="w-4 h-4 ml-2 inline" />
                 </>
               )}
             </Button>
