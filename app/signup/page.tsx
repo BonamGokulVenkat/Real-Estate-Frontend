@@ -25,7 +25,7 @@ export default function SignupRoleSelection() {
           <motion.h1
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
             className="font-serif text-4xl md:text-6xl font-light text-white tracking-tight"
-          >
+          > <br/>
             Choose your <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">Journey</span>
           </motion.h1>
 
