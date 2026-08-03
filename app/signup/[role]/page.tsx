@@ -210,7 +210,7 @@ export default function Signup({ params }: PageProps) {
           <div className="mt-10">
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 h-px bg-white/5" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Registration</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Or Continue With</span>
               <div className="flex-1 h-px bg-white/5" />
             </div>
             <div className="grid grid-cols-1 gap-4">
