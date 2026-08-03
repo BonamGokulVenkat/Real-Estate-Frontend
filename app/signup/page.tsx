@@ -47,12 +47,12 @@ export default function SignupRoleSelection() {
                 <div className="w-20 h-20 bg-[#0A192F] rounded-2xl flex items-center justify-center mb-8 border border-white/5 group-hover:border-amber-500/30 group-hover:-translate-y-2 transition-all duration-300 shadow-inner">
                   <UserCircle className="w-10 h-10 text-white/50 group-hover:text-amber-500 transition-colors" />
                 </div>
-                <h2 className="text-2xl font-serif font-bold text-white mb-4">Acquire</h2>
+                <h2 className="text-2xl font-serif font-bold text-white mb-4">Find a Property</h2>
                 <p className="text-white/40 text-sm leading-relaxed mb-8 flex-1">
-                  Discover and acquire dream luxury estates, save your exclusive portfolio, and contact elite agents.
+                  Explore exceptional luxury properties and carefully selected opportunities worldwide. Save your favourites, receive personalised introductions and request confidential private viewings through Luxoria.
                 </p>
                 <div className="flex items-center text-xs font-bold uppercase tracking-widest text-white/30 group-hover:text-amber-500 transition-colors">
-                  Continue as Buyer <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
+                  EXPLORE PROPERTIES <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
                 </div>
               </div>
             </Link>
@@ -67,12 +67,12 @@ export default function SignupRoleSelection() {
                 <div className="w-20 h-20 bg-[#0A192F] rounded-2xl flex items-center justify-center mb-8 border border-white/5 group-hover:border-amber-500/30 group-hover:-translate-y-2 transition-all duration-300 shadow-inner">
                   <Building className="w-10 h-10 text-white/50 group-hover:text-amber-500 transition-colors" />
                 </div>
-                <h2 className="text-2xl font-serif font-bold text-white mb-4">List</h2>
+                <h2 className="text-2xl font-serif font-bold text-white mb-4">List a Property</h2>
                 <p className="text-white/40 text-sm leading-relaxed mb-8 flex-1">
-                  List your premium properties, manage exclusive viewings, and reach our global network.
+                  Showcase your property or development to our growing global network of qualified buyers, family offices, private investors and wealth professionals. Luxoria provides international visibility and manages enquiries and private introductions on your behalf.
                 </p>
                 <div className="flex items-center text-xs font-bold uppercase tracking-widest text-white/30 group-hover:text-amber-500 transition-colors">
-                  Continue as Seller <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
+                  LIST YOUR PROPERTY <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
                 </div>
               </div>
             </Link>
@@ -87,7 +87,7 @@ export default function SignupRoleSelection() {
             Already registered?
           </span>
           <Link href="/login" className="text-amber-500 hover:text-amber-400 text-xs font-bold uppercase tracking-wider transition-colors ml-3 underline decoration-amber-500/30 underline-offset-4">
-            Sign In to Portal
+            Sign In
           </Link>
         </motion.div>
       </div>
