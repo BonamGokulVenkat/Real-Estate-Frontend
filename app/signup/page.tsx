@@ -49,7 +49,7 @@ export default function SignupRoleSelection() {
                 </div>
                 <h2 className="text-2xl font-serif font-bold text-white mb-4">Find a Property</h2>
                 <p className="text-white/40 text-sm leading-relaxed mb-8 flex-1">
-                  Explore exceptional luxury properties and carefully selected opportunities worldwide. Save your favourites, receive personalised introductions and request confidential private viewings through Luxoria.
+                  Explore exceptional luxury properties and carefully selected opportunities worldwide. Save your favourites, receive personalised introductions and request confidential private viewings through Luxora.
                 </p>
                 <div className="flex items-center text-xs font-bold uppercase tracking-widest text-white/30 group-hover:text-amber-500 transition-colors">
                   EXPLORE PROPERTIES <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
@@ -69,7 +69,7 @@ export default function SignupRoleSelection() {
                 </div>
                 <h2 className="text-2xl font-serif font-bold text-white mb-4">List a Property</h2>
                 <p className="text-white/40 text-sm leading-relaxed mb-8 flex-1">
-                  Showcase your property or development to our growing global network of qualified buyers, family offices, private investors and wealth professionals. Luxoria provides international visibility and manages enquiries and private introductions on your behalf.
+                  Showcase your property or development to our growing global network of qualified buyers, family offices, private investors and wealth professionals. Luxora provides international visibility and manages enquiries and private introductions on your behalf.
                 </p>
                 <div className="flex items-center text-xs font-bold uppercase tracking-widest text-white/30 group-hover:text-amber-500 transition-colors">
                   LIST YOUR PROPERTY <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" />
