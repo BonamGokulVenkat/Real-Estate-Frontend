@@ -97,7 +97,7 @@ export default function Login() {
               Welcome <span className="text-white/40 italic font-light">Back</span>
             </h1>
             <p className="text-white/30 text-sm font-light leading-relaxed">
-              Access your private portfolio and insights
+              Access your saved properties, private viewing requests and personalised recommendations.
             </p>
           </div>
 
@@ -163,7 +163,7 @@ export default function Login() {
                 <Loader2 className="w-5 h-5 animate-spin mx-auto" />
               ) : (
                 <>
-                  Enter Portal <ArrowRight className="w-4 h-4 ml-2 inline" />
+                  SIGN IN <ArrowRight className="w-4 h-4 ml-2 inline" />
                 </>
               )}
             </Button>
@@ -173,7 +173,7 @@ export default function Login() {
           <div className="mt-10">
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 h-px bg-white/5" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Third-Party Access</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-white/20">Or CONTINUE WITH</span>
               <div className="flex-1 h-px bg-white/5" />
             </div>
             <div className="grid grid-cols-1 gap-4">
@@ -181,18 +181,18 @@ export default function Login() {
               <a href={`${API_URL}/auth/google`}
                 className="flex items-center justify-center h-12 rounded-2xl border border-white/5 bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:bg-white/10 hover:border-white/10 transition-all"
               >
-                Google
+                GOOGLE
               </a>
             </div>
           </div>
 
           <p className="text-center text-[10px] font-bold uppercase tracking-widest text-white/20 mt-10">
-            Seeking access?{" "}
+            NEW TO LUXORIA?{" "}
             <Link
               href="/signup"
               className="text-amber-500 hover:text-amber-400 transition-colors ml-1"
             >
-              Establish Account
+              CREATE AN ACCOUNT
             </Link>
           </p>
         </div>
