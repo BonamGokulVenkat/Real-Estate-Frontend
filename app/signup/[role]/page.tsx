@@ -122,7 +122,7 @@ export default function Signup({ params }: PageProps) {
               { roleDisplay ==="Builder" ? "Showcase Your Legacy" : "Begin Your Private Journey"}
             </h1>
             <p className="text-white/30 text-sm font-light leading-relaxed">
-              Join Luxoria’s global network and present your developments to family offices, private investors and wealth professionals as a {roleDisplay.toLowerCase()}
+              { roleDisplay==="Builder"? "Join Luxoria’s global network and present your developments to family offices, private investors and wealth professionals as a Builder/Developer" : "Create your Luxoria account to discover exceptional luxury properties, save your favourites and request confidential private viewings."}
             </p>
           </div>
 
