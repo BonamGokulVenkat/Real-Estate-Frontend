@@ -119,7 +119,7 @@ export default function Signup({ params }: PageProps) {
               </span>
             </div>
             <h1 className="font-serif text-3xl md:text-4xl font-bold text-white tracking-tight">
-              Showcase Your <span className="text-white/40 italic font-light">Legacy</span>
+              { roleDisplay ==="Builder" ? "Showcase Your Legacy" : "Begin Your Private Journey"}
             </h1>
             <p className="text-white/30 text-sm font-light leading-relaxed">
               Join Luxoria’s global network and present your developments to family offices, private investors and wealth professionals as a {roleDisplay.toLowerCase()}
@@ -159,7 +159,7 @@ export default function Signup({ params }: PageProps) {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
               <Input
                 type="text"
-                placeholder="Company / Developer Name"
+                placeholder={roleDisplay === "Builder"? "Company/Developer Name" : "Your Full Name"} 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
