@@ -408,7 +408,7 @@ export default function PropertyClient({
 
               {agency && (
                 <div className="bg-white/[0.02] p-8 rounded-[40px] border border-white/5 space-y-6">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/20">Exclusive Representation</p>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/20">Luxoria Private Client Representation</p>
                   <Link href={`/agencies/${agency.id}`} className="flex items-center gap-5 group">
                     <div className="w-16 h-16 bg-[#0D2137] border border-white/10 rounded-2xl flex items-center justify-center font-serif font-bold text-2xl text-white group-hover:border-amber-500 transition-all">
                       {agency.name[0]}
@@ -420,10 +420,6 @@ export default function PropertyClient({
                       </div>
                     </div>
                   </Link>
-                  <Separator className="bg-white/5" />
-                  <div className="flex items-center gap-3 text-[10px] font-bold text-white/30 tracking-widest uppercase">
-                    <ShieldCheck className="w-4 h-4 text-blue-500/50" /> Luxora Certified Firm
-                  </div>
                 </div>
               )}
             </div>

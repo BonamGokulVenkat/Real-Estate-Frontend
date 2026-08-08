@@ -51,6 +51,12 @@ export default function AgencyCard({ agency, index }: { agency: Agency; index: n
             )}
           </div>
 
+          <div className="mb-4">
+            <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-amber-500/80 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">
+              Luxoria Private Client Representation
+            </span>
+          </div>
+
           <div className="space-y-2 mb-8">
             <h3 className="text-2xl font-serif font-bold text-white group-hover:text-amber-400 transition-colors">
               {agency.name}
