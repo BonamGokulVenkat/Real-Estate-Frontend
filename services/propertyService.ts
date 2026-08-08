@@ -92,6 +92,12 @@ export const propertyService = {
     return Array.isArray(res.data) ? res.data : [];
   },
 
+  getMaxPrice: async (country?: string): Promise<number> => {
+    const params = country ? `?currency=${encodeURIComponent(country)}` : "";
+    const res = await apiClient.get(`/properties/max-price${params}`);
+    return Number(res.data) || 10000000;
+  },
+
   getById: async (id: string): Promise<Property> => {
     const res = await apiClient.get(`/properties/${id}`);
     return res.data;

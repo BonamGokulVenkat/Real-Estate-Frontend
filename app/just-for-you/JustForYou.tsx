@@ -6,7 +6,6 @@ import { SlidersHorizontal, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useRouter, useSearchParams } from 'next/navigation';
-// Shadcn Components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -18,8 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-
-// Custom Components
 import PropertyCard from "@/components/common/PropertyCard";
 import { propertyService, Property } from "@/services/propertyService";
 
@@ -28,8 +25,9 @@ const types = ["all", "villa", "apartment", "house", "land", "commercial"] as co
 export default function JustForYou() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { formatPrice, currency, getConvertedPrice, rates } = useCurrency();
 
-  // ── Initialize filters from URL params (from hero search) ─────────────────
+  // ── Initialize filters from URL params ─────────────────
   const [typeFilter, setTypeFilter] = useState<string>(
     searchParams.get("type") || "all"
   );
@@ -40,12 +38,31 @@ export default function JustForYou() {
     searchParams.get("city") || "all"
   );
   const [sortBy, setSortBy] = useState<string>("newest");
-  const [maxPrice, setMaxPrice] = useState<number[]>([100000000]);
+  const [maxPrice, setMaxPrice] = useState<number[]>([100000000]); // In selected currency
   const [minBeds, setMinBeds] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
-  const { formatPrice } = useCurrency();
 
-  // ── Sync URL params → state when URL changes (e.g. browser back/forward) ──
+  // ── Fetch max price from backend ──────────────────────────
+  const { data: maxPriceInINR = 100000000 } = useQuery<number>({
+    queryKey: ["max-price", countryFilter],
+    queryFn: () => propertyService.getMaxPrice(countryFilter !== "all" ? countryFilter : undefined),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // ── Calculate max price in current currency ──────────────
+  const maxPriceInCurrency = getConvertedPrice(maxPriceInINR);
+  const maxPriceCeiling = Math.ceil(maxPriceInCurrency);
+
+  // ── Get display max for slider ────────────────────────────
+  const sliderMax = maxPriceCeiling > 0 ? maxPriceCeiling : 10000000;
+
+  // ── Convert slider value to INR for backend ──────────────
+  const getPriceInINR = (valueInCurrency: number): number => {
+    const rate = rates[currency] || 1;
+    return Math.ceil(valueInCurrency / rate);
+  };
+
+  // ── Sync URL params → state ──────────────────────────────
   useEffect(() => {
     const type = searchParams.get("type");
     const country = searchParams.get("country");
@@ -53,34 +70,32 @@ export default function JustForYou() {
     if (type) setTypeFilter(type);
     if (country) setCountryFilter(country);
     if (city) setCityFilter(city);
+    
+    // Restore max price from URL if present
+    const maxPriceParam = searchParams.get("max_price");
+    if (maxPriceParam) {
+      const parsed = Number(maxPriceParam);
+      if (!isNaN(parsed) && parsed > 0) {
+        setMaxPrice([parsed]);
+      }
+    }
   }, [searchParams]);
 
-  // ── Update URL when filters change (replace, not push, to avoid history spam) ─
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (typeFilter !== "all") params.set("type", typeFilter);
-    if (cityFilter !== "all") params.set("city", cityFilter);
-    if (countryFilter !== "all") params.set("country", countryFilter);
-    if (maxPrice[0] < 100000000) params.set("max_price", maxPrice[0].toString());
-    if (minBeds > 0) params.set("bedrooms", minBeds.toString());
-    router.replace(`?${params.toString()}`, { scroll: false });
-  }, [typeFilter, cityFilter, countryFilter, maxPrice, minBeds]);
-
-  // ── Fetch available cities from DB ─────────────────────────────────────────
+  // ── Fetch available cities ────────────────────────────────
   const { data: availableCities = [], isLoading: citiesLoading } = useQuery<string[]>({
     queryKey: ["property-cities", countryFilter],
     queryFn: () => propertyService.getCities(countryFilter !== "all" ? countryFilter : undefined),
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── Fetch available countries from DB ───────────────────────────────────────
+  // ── Fetch available countries ─────────────────────────────
   const { data: availableCountries = [], isLoading: countriesLoading } = useQuery<string[]>({
     queryKey: ["property-countries"],
     queryFn: () => propertyService.getCountries(),
     staleTime: 5 * 60 * 1000,
   });
 
-  // ── Fetch filtered properties ───────────────────────────────────────────────
+  // ── Fetch filtered properties ─────────────────────────────
   const { data: properties, isLoading, error } = useQuery<Property[]>({
     queryKey: ["properties", typeFilter, cityFilter, countryFilter, maxPrice[0], minBeds, sortBy],
     queryFn: async () => {
@@ -88,40 +103,74 @@ export default function JustForYou() {
       if (typeFilter !== "all") params.property_type = typeFilter;
       if (cityFilter !== "all") params.city = cityFilter;
       if (countryFilter !== "all") params.country = countryFilter;
-      if (maxPrice[0] < 100000000) params.max_price = maxPrice[0];
+      
+      // Convert current currency max to INR for backend
+      if (maxPrice[0] < sliderMax) {
+        const maxInINR = getPriceInINR(maxPrice[0]);
+        params.max_price = Math.ceil(maxInINR);
+      }
+      
       if (minBeds > 0) params.bedrooms = minBeds;
       console.log("SEARCH PARAMS:", params);
 
       const data = await propertyService.search(params);
-      const getNumericPrice = (price: string)=>{
+      const getNumericPrice = (price: string) => {
         const num = Number(price);
         return isNaN(num) ? Number.MAX_SAFE_INTEGER : num;
-      }
+      };
       let sorted = [...data];
       if (sortBy === "price-asc") sorted.sort((a, b) => getNumericPrice(a.price) - getNumericPrice(b.price));
       if (sortBy === "price-desc") sorted.sort((a, b) => getNumericPrice(b.price) - getNumericPrice(a.price));
 
       return sorted;
     },
+    enabled: sliderMax > 0,
   });
 
   const filtered = properties || [];
 
   const handleCountryChange = (country: string) => {
     setCountryFilter(country);
-    setCityFilter("all");  // ← clear stale city when country switches
+    setCityFilter("all");
   };
+
   const handleReset = () => {
-    setMaxPrice([100000000]);
+    setMaxPrice([sliderMax]);
     setMinBeds(0);
     setTypeFilter("all");
     setCityFilter("all");
     setCountryFilter("all");
   };
-  return (
 
+  const maxPriceVal = maxPrice[0];
+  const searchParamsStr = searchParams.toString();
+
+  // ── Sync slider max when currency or sliderMax initial value loads ──
+  useEffect(() => {
+    if (sliderMax > 0 && maxPriceVal === 100000000) {
+      setMaxPrice([sliderMax]);
+    }
+  }, [sliderMax, maxPriceVal]);
+
+  // ── Update URL when filters change ──────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (typeFilter !== "all") params.set("type", typeFilter);
+    if (cityFilter !== "all") params.set("city", cityFilter);
+    if (countryFilter !== "all") params.set("country", countryFilter);
+    if (maxPriceVal < sliderMax) {
+      params.set("max_price", maxPriceVal.toString());
+    }
+    if (minBeds > 0) params.set("bedrooms", minBeds.toString());
+
+    const newQuery = params.toString();
+    if (newQuery !== searchParamsStr) {
+      router.replace(`?${newQuery}`, { scroll: false });
+    }
+  }, [typeFilter, cityFilter, countryFilter, maxPriceVal, minBeds, sliderMax, searchParamsStr, router]);
+
+  return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
-      {/* Background Glows */}
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
       <div className="container mx-auto px-4 lg:px-8 relative z-10">
@@ -149,8 +198,7 @@ export default function JustForYou() {
 
         {/* ── Toolbar ── */}
         <div className="flex flex-col gap-4 mb-12 p-3 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-xl">
-
-          {/* Row 1 — Property type pills */}
+          {/* Property type pills */}
           <div className="flex flex-wrap items-center gap-2">
             {types.map((t) => (
               <Button
@@ -168,9 +216,9 @@ export default function JustForYou() {
             ))}
           </div>
 
-          {/* Divider */}
           <div className="h-[1px] bg-white/5 w-full" />
-          {/*Row 2 - country filter */}  
+
+          {/* Country filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 mr-1">
               <MapPin className="w-3 h-3 text-amber-500/60" />
@@ -178,7 +226,6 @@ export default function JustForYou() {
                 Country
               </span>
             </div>
-            {/* All Countries pill */}
             <Button
               variant={countryFilter === "all" ? "default" : "ghost"}
               onClick={() => handleCountryChange("all")}
@@ -191,7 +238,6 @@ export default function JustForYou() {
               All Countries
             </Button>
 
-            {/* Skeleton pills while loading */}
             {countriesLoading &&
               [1, 2, 3].map((n) => (
                 <div
@@ -200,7 +246,6 @@ export default function JustForYou() {
                 />
               ))}
 
-            {/* Dynamic country pills from DB */}
             {!countriesLoading &&
               availableCountries.map((country) => (
                 <Button
@@ -218,9 +263,9 @@ export default function JustForYou() {
               ))}
           </div>
 
-          {/* Divider */}
           <div className="h-[1px] bg-white/5 w-full" />
-          {/* Row 3 — City filter */}
+
+          {/* City filter */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 mr-1">
               <MapPin className="w-3 h-3 text-amber-500/60" />
@@ -229,7 +274,6 @@ export default function JustForYou() {
               </span>
             </div>
 
-            {/* All Cities pill */}
             <Button
               variant={cityFilter === "all" ? "default" : "ghost"}
               onClick={() => setCityFilter("all")}
@@ -242,7 +286,6 @@ export default function JustForYou() {
               All Cities
             </Button>
 
-            {/* Skeleton pills while loading */}
             {citiesLoading &&
               [1, 2, 3].map((n) => (
                 <div
@@ -251,7 +294,6 @@ export default function JustForYou() {
                 />
               ))}
 
-            {/* Dynamic city pills from DB */}
             {!citiesLoading &&
               availableCities.map((city) => (
                 <Button
@@ -269,10 +311,9 @@ export default function JustForYou() {
               ))}
           </div>
 
-          {/* Divider */}
           <div className="h-[1px] bg-white/5 w-full" />
 
-          {/* Row 3 — Sort + mobile filter toggle */}
+          {/* Sort + mobile filter toggle */}
           <div className="flex items-center justify-between">
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px] bg-transparent border-none text-[10px] font-bold uppercase tracking-widest text-amber-500 focus:ring-0">
@@ -306,7 +347,6 @@ export default function JustForYou() {
             className={`${showFilters ? "block" : "hidden"} lg:block w-full lg:w-72 shrink-0`}
           >
             <div className="bg-white/[0.02] backdrop-blur-3xl rounded-[32px] p-7 border border-white/10 sticky top-32 space-y-8 shadow-2xl">
-              {/* Header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-amber-500" />
@@ -325,7 +365,7 @@ export default function JustForYou() {
 
               <Separator className="bg-white/5" />
 
-              {/* 1. Price Range */}
+              {/* Price Range */}
               <div className="space-y-5">
                 <div className="flex justify-between items-end">
                   <label className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">
@@ -333,30 +373,29 @@ export default function JustForYou() {
                   </label>
                   <div className="text-right">
                     <span className="text-xl font-serif font-bold text-amber-500 tabular-nums">
-                      {formatPrice(maxPrice[0])}
+                      {formatPrice(getPriceInINR(maxPrice[0]), { ceil: true })}
                     </span>
                   </div>
                 </div>
 
                 <div className="relative py-2">
                   <Slider
-                    defaultValue={[5000000]}
-                    max={100000000}
-                    min={100000}
-                    step={maxPrice[0] < 1000000 ? 50000 : 500000}
                     value={maxPrice}
                     onValueChange={setMaxPrice}
+                    max={sliderMax}
+                    min={Math.ceil(getConvertedPrice(100000))}
+                    step={sliderMax > 1000000 ? 50000 : 5000}
                     className="relative flex items-center select-none touch-none w-full"
                   />
                 </div>
 
                 <div className="flex justify-between text-[8px] font-bold uppercase tracking-[0.2em] text-white/10">
-                  <span>1 Lakh</span>
-                  <span>10 Cr</span>
+                  <span>{formatPrice(100000)}</span>
+                  <span>{formatPrice(getPriceInINR(sliderMax), { ceil: true })}</span>
                 </div>
               </div>
 
-              {/* 2. Bedrooms */}
+              {/* Bedrooms */}
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
                   Bedrooms
@@ -380,6 +419,7 @@ export default function JustForYou() {
               </div>
             </div>
           </aside>
+
           {/* ── Property Grid ── */}
           <div className="flex-1">
             <div className="flex items-center justify-between mb-8 px-2">
@@ -414,10 +454,10 @@ export default function JustForYou() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                              {filtered.map((p: any, i: number) => (
-                                <PropertyCard key={p.property_id} property={p} index={i} />
-                              ))}
-                </div>
+                {filtered.map((p: any, i: number) => (
+                  <PropertyCard key={p.property_id} property={p} index={i} />
+                ))}
+              </div>
             )}
           </div>
         </div>

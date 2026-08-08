@@ -33,7 +33,7 @@ export const useCurrency = () => {
     return converted;
   };
 
-  const formatPrice = (priceInINR: string | number): string => {
+  const formatPrice = (priceInINR: string | number, options?: { ceil?: boolean }): string => {
     // Parse string to number
     const numeric = typeof priceInINR === 'string' ? Number(priceInINR) : priceInINR;
 
@@ -45,27 +45,47 @@ export const useCurrency = () => {
     const converted = getConvertedPrice(numeric);
     if (!converted) return '—';
 
+    const shouldCeil = options?.ceil;
+
     // ── INR formatting ──
     if (currency === 'INR') {
-      if (converted >= 1e7) return `₹${(converted / 1e7).toFixed(2)} Cr`;
-      if (converted >= 1e5) return `₹${(converted / 1e5).toFixed(2)} L`;
-      return `₹${Math.round(converted).toLocaleString('en-IN')}`;
+      if (converted >= 1e7) {
+        const val = converted / 1e7;
+        return `₹${shouldCeil ? Math.ceil(val) : val.toFixed(2)} Cr`;
+      }
+      if (converted >= 1e5) {
+        const val = converted / 1e5;
+        return `₹${shouldCeil ? Math.ceil(val) : val.toFixed(2)} L`;
+      }
+      return `₹${(shouldCeil ? Math.ceil(converted) : Math.round(converted)).toLocaleString('en-IN')}`;
     }
 
     // ── AED formatting ──
     if (currency === 'AED') {
-      if (converted >= 1e6) return `AED ${(converted / 1e6).toFixed(2)}M`;
-      if (converted >= 1e3) return `AED ${(converted / 1e3).toFixed(0)}K`;
-      return `AED ${Math.round(converted).toLocaleString()}`;
+      if (converted >= 1e6) {
+        const val = converted / 1e6;
+        return `AED ${shouldCeil ? Math.ceil(val) : val.toFixed(2)}M`;
+      }
+      if (converted >= 1e3) {
+        const val = converted / 1e3;
+        return `AED ${shouldCeil ? Math.ceil(val) : val.toFixed(0)}K`;
+      }
+      return `AED ${(shouldCeil ? Math.ceil(converted) : Math.round(converted)).toLocaleString()}`;
     }
 
     // ── USD / EUR / GBP formatting ──
     const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£' };
     const symbol = symbols[currency] ?? currency;
 
-    if (converted >= 1e6) return `${symbol}${(converted / 1e6).toFixed(2)}M`;
-    if (converted >= 1e3) return `${symbol}${(converted / 1e3).toFixed(0)}K`;
-    return `${symbol}${Math.round(converted).toLocaleString()}`;
+    if (converted >= 1e6) {
+      const val = converted / 1e6;
+      return `${symbol}${shouldCeil ? Math.ceil(val) : val.toFixed(2)}M`;
+    }
+    if (converted >= 1e3) {
+      const val = converted / 1e3;
+      return `${symbol}${shouldCeil ? Math.ceil(val) : val.toFixed(0)}K`;
+    }
+    return `${symbol}${(shouldCeil ? Math.ceil(converted) : Math.round(converted)).toLocaleString()}`;
   };
 
   return { currency, setCurrency, formatPrice, rates, getConvertedPrice };
