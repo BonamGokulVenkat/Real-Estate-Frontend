@@ -276,7 +276,7 @@ export default function PropertyClient({
             <section className="max-w-3xl">
               <h2 className="font-serif text-3xl font-bold mb-8 italic text-white/80">The Narrative</h2>
               <div className="space-y-6 text-white/50 text-lg font-light leading-relaxed">
-                <p>{property.description}</p>
+                <p className="whitespace-pre-line text-justify">{property.description}</p>
                 <p>
                   Listed in <span className="text-white font-medium">{property.date_added ? new Date(property.date_added).getFullYear() : "—"}</span>, this{" "}
                   <span className="text-white font-medium">{property.size_sqft ?? "—"} sqft</span> sanctuary represents the peak of
