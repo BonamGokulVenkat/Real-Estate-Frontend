@@ -10,22 +10,11 @@ export default function SignupRoleSelection() {
 
       <div className="w-full max-w-4xl relative z-10">
         <div className="text-center mb-16 space-y-4">
-          <motion.div
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-3 mb-6"
-          >
-            <div className="h-px w-8 bg-amber-500/50" />
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span className="text-amber-500 text-xs font-bold tracking-[0.4em] uppercase">
-              Luxora Estates
-            </span>
-            <div className="h-px w-8 bg-amber-500/50" />
-          </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
-            className="font-serif text-4xl md:text-6xl font-light text-white tracking-tight"
-          > <br/>
+            className="font-serif text-4xl md:text-6xl font-light text-white tracking-tight pt-20"
+          >
             Choose your <span className="font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-amber-500">Journey</span>
           </motion.h1>
 
