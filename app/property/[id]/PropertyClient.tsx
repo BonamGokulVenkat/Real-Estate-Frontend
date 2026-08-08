@@ -19,12 +19,20 @@ import {
   Sparkles,
   Loader2,
   PlayCircle,
+  MessageSquare,
 } from "lucide-react";
 
 import PropertyCard from "@/components/common/PropertyCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { propertyService, Property } from "@/services/propertyService";
 
 import { useAuthStore } from "@/store/useAuthStore";
@@ -113,6 +121,36 @@ export default function PropertyClient({
   };
 
   const [activeImg, setActiveImg] = useState(0);
+
+  const [isViewingModalOpen, setIsViewingModalOpen] = useState(false);
+  const [viewingSubmitted, setViewingSubmitted] = useState(false);
+  const [viewingForm, setViewingForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    preferredDate: "",
+    message: "",
+  });
+
+  const handleViewingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setViewingSubmitted(true);
+    toast.success("Viewing request submitted!");
+  };
+
+  const handleCloseModal = () => {
+    setIsViewingModalOpen(false);
+    setTimeout(() => {
+      setViewingSubmitted(false);
+      setViewingForm({
+        name: "",
+        phone: "",
+        email: "",
+        preferredDate: "",
+        message: "",
+      });
+    }, 300);
+  };
 
   if (isLoading) {
     return (
@@ -349,12 +387,22 @@ export default function PropertyClient({
                 </div>
 
                 <div className="space-y-4">
-                  <Button className="w-full h-16 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-xs">
-                    Arrange Private Tour
+                  <Button
+                    onClick={() => setIsViewingModalOpen(true)}
+                    className="w-full h-16 bg-amber-500 hover:bg-amber-400 text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-xs transition-all hover:scale-[1.01] shadow-lg shadow-amber-500/10"
+                  >
+                    Request Private Viewing
                   </Button>
-                  <Button variant="outline" className="w-full h-16 bg-transparent border-white/10 text-white rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-white/5">
-                    Request Prospectus
-                  </Button>
+
+                  <a
+                    href="https://wa.me/447921687994"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full h-16 flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#20bd5a] text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-xs transition-all hover:scale-[1.01] shadow-lg shadow-emerald-500/10"
+                  >
+                    <MessageSquare className="w-4 h-4 fill-[#0A192F]" />
+                    WhatsApp Luxoria • +44 792 168 7994
+                  </a>
                 </div>
               </div>
 
@@ -400,6 +448,122 @@ export default function PropertyClient({
           </div>
         </section>
       </div>
+
+      {/* ── REQUEST PRIVATE VIEWING MODAL ── */}
+      <Dialog open={isViewingModalOpen} onOpenChange={(open) => {
+        if (!open) handleCloseModal();
+        else setIsViewingModalOpen(true);
+      }}>
+        <DialogContent className="bg-[#0D2137] border-white/10 text-white max-w-lg rounded-3xl p-8 sm:p-10 shadow-2xl">
+          {!viewingSubmitted ? (
+            <>
+              <DialogHeader className="space-y-2 text-left mb-2">
+                <DialogTitle className="font-serif text-2xl md:text-3xl font-bold text-white">
+                  Request Private Viewing
+                </DialogTitle>
+                <DialogDescription className="text-white/50 text-xs uppercase tracking-widest font-medium">
+                  {property.title}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleViewingSubmit} className="space-y-4 mt-2">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Name <span className="text-amber-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Your full name"
+                    value={viewingForm.name}
+                    onChange={(e) => setViewingForm({ ...viewingForm, name: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500 text-sm transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Phone / WhatsApp <span className="text-amber-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+44 7000 000000"
+                    value={viewingForm.phone}
+                    onChange={(e) => setViewingForm({ ...viewingForm, phone: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500 text-sm transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Email <span className="text-amber-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="yourname@example.com"
+                    value={viewingForm.email}
+                    onChange={(e) => setViewingForm({ ...viewingForm, email: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500 text-sm transition-colors"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Preferred Date <span className="text-amber-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={viewingForm.preferredDate}
+                    onChange={(e) => setViewingForm({ ...viewingForm, preferredDate: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500 text-sm transition-colors [color-scheme:dark]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                    Message <span className="text-white/30">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="Any special requests or details..."
+                    value={viewingForm.message}
+                    onChange={(e) => setViewingForm({ ...viewingForm, message: e.target.value })}
+                    className="w-full p-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:border-amber-500 text-sm transition-colors resize-none"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-14 mt-4 bg-amber-500 hover:bg-amber-400 text-[#0A192F] font-bold uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg shadow-amber-500/10"
+                >
+                  Send Request
+                </Button>
+              </form>
+            </>
+          ) : (
+            <div className="py-6 text-center space-y-6">
+              <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-amber-500" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="font-serif text-2xl font-bold text-white">Viewing Request Received</h3>
+                <p className="text-white/70 text-sm leading-relaxed max-w-md mx-auto">
+                  Thank you. Your viewing request has been received. A Luxoria advisor will contact you shortly to arrange the appointment.
+                </p>
+              </div>
+              <Button
+                onClick={handleCloseModal}
+                className="w-full h-12 bg-white/10 hover:bg-white/20 text-white font-bold uppercase tracking-widest text-xs rounded-xl transition-colors"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
