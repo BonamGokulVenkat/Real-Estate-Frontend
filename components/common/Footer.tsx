@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Phone, Mail, Instagram, Linkedin, Twitter, ArrowRight } from "lucide-react";
+import { MapPin, Phone, Mail, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Shadcn UI Components
@@ -14,14 +14,13 @@ const FOOTER_LINKS = {
     { label: "Just For You", path: "/just-for-you" },
     { label: "Find Agencies", path: "/agencies" },
     { label: "Sell Property", path: "/sell" },
-    { label: "Our Portfolio", path: "/portfolio" },
   ],
   propertyTypes: [
-    "Luxury Villas",
-    "Penthouse Suites",
-    "Modern Apartments",
-    "Townhouses",
-    "Private Estates",
+    { label: "Luxury Villas", type: "villa" },
+    { label: "Modern Apartments", type: "apartment" },
+    { label: "Houses & Townhomes", type: "house" },
+    { label: "Prime Land", type: "land" },
+    { label: "Commercial Properties", type: "commercial" },
   ],
 };
 
@@ -45,19 +44,9 @@ export default function Footer() {
                 Luxora <span className="text-amber-500">Estates</span>
               </span>
             </Link>
-            <p className="text-white/50 text-sm leading-relaxed max-w-sm mb-8">
+            <p className="text-white/50 text-sm leading-relaxed max-w-sm">
               Redefining luxury real estate with a curated collection of newly built premium properties. Experience elegance in every square foot.
             </p>
-            <div className="flex gap-4">
-              {[Instagram, Linkedin, Twitter].map((Icon, i) => (
-                <button 
-                  key={i} 
-                  className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center hover:bg-amber-500 hover:text-[#0A192F] hover:border-amber-500 transition-all duration-300"
-                >
-                  <Icon className="w-4 h-4" />
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* ── Quick Links ── */}
@@ -82,9 +71,15 @@ export default function Footer() {
           <div className="lg:col-span-2">
             <h4 className="font-serif text-lg font-semibold mb-6 text-white">Collection</h4>
             <ul className="space-y-4">
-              {FOOTER_LINKS.propertyTypes.map((type) => (
-                <li key={type} className="text-sm text-white/40 hover:text-white transition-colors cursor-pointer">
-                  {type}
+              {FOOTER_LINKS.propertyTypes.map((item) => (
+                <li key={item.label}>
+                  <Link 
+                    href={`/just-for-you?type=${item.type}`}
+                    className="text-sm text-white/40 hover:text-amber-400 transition-colors flex items-center group"
+                  >
+                    <ArrowRight className="w-0 h-3 mr-0 opacity-0 group-hover:w-3 group-hover:mr-2 group-hover:opacity-100 transition-all" />
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -129,8 +124,8 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] md:text-xs uppercase tracking-[0.2em] text-white/30 font-medium">
           <p>© 2026 Luxora Estates. All rights reserved.</p>
           <div className="flex gap-8">
-            <Link href="/privacy" className="hover:text-amber-500 transition-colors">Privacy Policy</Link>
-            <Link href="/terms" className="hover:text-amber-500 transition-colors">Terms of Service</Link>
+            <Link href="/terms#privacy-policy" className="hover:text-amber-500 transition-colors">Privacy Policy</Link>
+            <Link href="/terms#terms-of-service" className="hover:text-amber-500 transition-colors">Terms of Service</Link>
           </div>
         </div>
       </div>
