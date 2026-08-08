@@ -159,7 +159,7 @@ export default function Signup({ params }: PageProps) {
               <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
               <Input
                 type="text"
-                placeholder={roleDisplay === "Builder"? "Company/Developer Name" : "Your Full Name"} 
+                placeholder={roleDisplay === "Builder" ? "Company/Developer Name" : "Full Name"} 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -183,7 +183,7 @@ export default function Signup({ params }: PageProps) {
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
               <Input
                 type="password"
-                placeholder="Password"
+                placeholder="Create Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -200,7 +200,7 @@ export default function Signup({ params }: PageProps) {
                 <Loader2 className="w-5 h-5 animate-spin mx-auto" />
               ) : (
                 <>
-                  CREATE BUILDER/DEVELOPER ACCOUNT <ArrowRight className="w-4 h-4 ml-2 inline" />
+                  CREATE {roleDisplay === "Builder" ? "BUILDER" : "INDIVIDUAL"} ACCOUNT <ArrowRight className="w-4 h-4 ml-2 inline" />
                 </>
               )}
             </Button>
