@@ -38,7 +38,8 @@ export default function JustForYou() {
     searchParams.get("city") || "all"
   );
   const [sortBy, setSortBy] = useState<string>("newest");
-  const [maxPrice, setMaxPrice] = useState<number[]>([100000000]); // In selected currency
+  // Store the user's budget in INR (null = "no limit / slider at max")
+  const [userMaxPriceINR, setUserMaxPriceINR] = useState<number | null>(null);
   const [minBeds, setMinBeds] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -56,6 +57,12 @@ export default function JustForYou() {
   // ── Get display max for slider ────────────────────────────
   const sliderMax = maxPriceCeiling > 0 ? maxPriceCeiling : 10000000;
 
+  // ── Slider display value: convert user's INR budget → current currency ──
+  // If user hasn't set a budget yet, slider sits at sliderMax
+  const sliderValue = userMaxPriceINR !== null
+    ? Math.min(Math.ceil(getConvertedPrice(userMaxPriceINR)), sliderMax)
+    : sliderMax;
+
   // ── Convert slider value to INR for backend ──────────────
   const getPriceInINR = (valueInCurrency: number): number => {
     const rate = rates[currency] || 1;
@@ -71,12 +78,12 @@ export default function JustForYou() {
     if (country) setCountryFilter(country);
     if (city) setCityFilter(city);
     
-    // Restore max price from URL if present
+    // Restore max price (stored as currency value in URL) → convert to INR
     const maxPriceParam = searchParams.get("max_price");
     if (maxPriceParam) {
       const parsed = Number(maxPriceParam);
       if (!isNaN(parsed) && parsed > 0) {
-        setMaxPrice([parsed]);
+        setUserMaxPriceINR(getPriceInINR(parsed));
       }
     }
   }, [searchParams]);
@@ -97,17 +104,16 @@ export default function JustForYou() {
 
   // ── Fetch filtered properties ─────────────────────────────
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ["properties", typeFilter, cityFilter, countryFilter, maxPrice[0], minBeds, sortBy],
+    queryKey: ["properties", typeFilter, cityFilter, countryFilter, userMaxPriceINR, minBeds, sortBy],
     queryFn: async () => {
       const params: any = {};
       if (typeFilter !== "all") params.property_type = typeFilter;
       if (cityFilter !== "all") params.city = cityFilter;
       if (countryFilter !== "all") params.country = countryFilter;
       
-      // Convert current currency max to INR for backend
-      if (maxPrice[0] < sliderMax) {
-        const maxInINR = getPriceInINR(maxPrice[0]);
-        params.max_price = Math.ceil(maxInINR);
+      // Send INR budget to backend only if user has set a limit
+      if (userMaxPriceINR !== null && userMaxPriceINR < maxPriceInINR) {
+        params.max_price = Math.ceil(userMaxPriceINR);
       }
       
       if (minBeds > 0) params.bedrooms = minBeds;
@@ -135,22 +141,14 @@ export default function JustForYou() {
   };
 
   const handleReset = () => {
-    setMaxPrice([sliderMax]);
+    setUserMaxPriceINR(null);
     setMinBeds(0);
     setTypeFilter("all");
     setCityFilter("all");
     setCountryFilter("all");
   };
 
-  const maxPriceVal = maxPrice[0];
   const searchParamsStr = searchParams.toString();
-
-  // ── Sync slider max when currency or sliderMax initial value loads ──
-  useEffect(() => {
-    if (sliderMax > 0 && maxPriceVal === 100000000) {
-      setMaxPrice([sliderMax]);
-    }
-  }, [sliderMax, maxPriceVal]);
 
   // ── Update URL when filters change ──────────────────────
   useEffect(() => {
@@ -158,8 +156,9 @@ export default function JustForYou() {
     if (typeFilter !== "all") params.set("type", typeFilter);
     if (cityFilter !== "all") params.set("city", cityFilter);
     if (countryFilter !== "all") params.set("country", countryFilter);
-    if (maxPriceVal < sliderMax) {
-      params.set("max_price", maxPriceVal.toString());
+    // Store slider value in current currency in URL for easy restoration
+    if (userMaxPriceINR !== null && userMaxPriceINR < maxPriceInINR) {
+      params.set("max_price", sliderValue.toString());
     }
     if (minBeds > 0) params.set("bedrooms", minBeds.toString());
 
@@ -167,7 +166,7 @@ export default function JustForYou() {
     if (newQuery !== searchParamsStr) {
       router.replace(`?${newQuery}`, { scroll: false });
     }
-  }, [typeFilter, cityFilter, countryFilter, maxPriceVal, minBeds, sliderMax, searchParamsStr, router]);
+  }, [typeFilter, cityFilter, countryFilter, userMaxPriceINR, sliderValue, minBeds, maxPriceInINR, searchParamsStr, router]);
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
@@ -373,18 +372,18 @@ export default function JustForYou() {
                   </label>
                   <div className="text-right">
                     <span className="text-xl font-serif font-bold text-amber-500 tabular-nums">
-                      {formatPrice(getPriceInINR(maxPrice[0]), { ceil: true })}
+                      {formatPrice(userMaxPriceINR ?? maxPriceInINR, { ceil: true })}
                     </span>
                   </div>
                 </div>
 
                 <div className="relative py-2">
                   <Slider
-                    value={maxPrice}
-                    onValueChange={setMaxPrice}
+                    value={[sliderValue]}
+                    onValueChange={(val) => setUserMaxPriceINR(getPriceInINR(val[0]))}
                     max={sliderMax}
                     min={Math.ceil(getConvertedPrice(100000))}
-                    step={sliderMax > 1000000 ? 50000 : 5000}
+                    step={Math.max(1, Math.ceil(sliderMax / 200))}
                     className="relative flex items-center select-none touch-none w-full"
                   />
                 </div>
