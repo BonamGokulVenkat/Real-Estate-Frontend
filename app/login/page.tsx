@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { authService } from "@/services/authService";
 import { useAuthStore, UserProfile } from "@/store/useAuthStore";
 import Cookies from "js-cookie";
-import { useRouter } from "next/navigation";
+
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -18,7 +18,7 @@ export default function Login() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const setUser = useAuthStore((state) => state.setUser);
-  const router = useRouter();
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,12 +50,16 @@ export default function Login() {
       const profile = data.user as unknown as UserProfile;
       setUser(profile);
 
+      // Use a hard navigation so the browser flushes the cookie before the
+      // next request is sent. Next.js router.push() fires an RSC fetch
+      // immediately, before the cookie is committed, so the Edge middleware
+      // sees no token and bounces the user back to /login.
       if (profile.role === "admin") {
-        router.push("/admin");
+        window.location.href = "/admin";
       } else if (profile.role === "builder") {
-        router.push("/sell");
+        window.location.href = "/sell";
       } else {
-        router.push("/");
+        window.location.href = "/";
       }
 
     } catch (error: any) {
