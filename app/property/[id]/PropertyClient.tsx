@@ -395,13 +395,13 @@ export default function PropertyClient({
                   </Button>
 
                   <a
-                    href="https://wa.me/447921687994"
+                    href="https://wa.me/447921687794"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full h-16 flex items-center justify-center gap-3 bg-[#25D366] hover:bg-[#20bd5a] text-[#0A192F] rounded-2xl font-bold uppercase tracking-widest text-xs transition-all hover:scale-[1.01] shadow-lg shadow-emerald-500/10"
                   >
                     <MessageSquare className="w-4 h-4 fill-[#0A192F]" />
-                    WhatsApp Luxoria • +44 792 168 7994
+                    WhatsApp Luxoria • +44 792 168 7794
                   </a>
                 </div>
               </div>
