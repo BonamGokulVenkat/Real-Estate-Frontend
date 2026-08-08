@@ -14,7 +14,7 @@ import { apiClient } from "@/lib/apiClient";
 export default function Subscription() {
   const router = useRouter();
   const { user, setUser } = useAuthStore();
-  const [loading, setLoading] = useState(false);
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
 
   const [plans, setPlans] = useState<any[]>([]);
 
@@ -45,7 +45,7 @@ export default function Subscription() {
       return;
     }
 
-    setLoading(true);
+    setLoadingPlanId(plan.id);
     try {
       const orderResponse = await apiClient.post('/subscription/create-order', { amount: plan.price });
       const order = orderResponse.data;
@@ -88,7 +88,7 @@ export default function Subscription() {
     } catch (error) {
       toast.error("Failed to initiate payment");
     } finally {
-      setLoading(false);
+      setLoadingPlanId(null);
     }
   };
 
@@ -154,14 +154,14 @@ export default function Subscription() {
 
               <Button
                 onClick={() => handlePayment(plan)}
-                disabled={loading || plan.price === 0 || user?.plan === plan.name}
+                disabled={loadingPlanId !== null || plan.price === 0 || user?.plan === plan.name}
                 className={`w-full h-14 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                   plan.price > 0
                     ? "bg-amber-500 hover:bg-amber-400 text-[#0A192F] shadow-lg shadow-amber-500/20"
                     : "bg-white/5 hover:bg-white/10 text-white border border-white/10"
                 }`}
               >
-                {loading
+                {loadingPlanId === plan.id
                   ? "Initializing..."
                   : user?.plan === plan.name
                   ? "✓ Current Plan"
