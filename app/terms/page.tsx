@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
-import { Shield, FileText, ArrowUp } from "lucide-react";
+import { Shield, FileText, ArrowUp, Loader2 } from "lucide-react";
 
-export default function TermsAndPrivacyPage() {
+function TermsAndPrivacyContent() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -235,3 +235,18 @@ export default function TermsAndPrivacyPage() {
     </div>
   );
 }
+
+export default function TermsAndPrivacyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#0A192F]">
+          <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+        </div>
+      }
+    >
+      <TermsAndPrivacyContent />
+    </Suspense>
+  );
+}
+
