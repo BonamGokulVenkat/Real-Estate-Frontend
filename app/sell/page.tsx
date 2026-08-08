@@ -43,7 +43,7 @@ declare global {
 
 export default function Sell() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const [files, setFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -193,6 +193,7 @@ export default function Sell() {
   // ─── Auth / Role guard ────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!isHydrated) return; // wait for localStorage rehydration before checking auth
     if (!isAuthenticated) {
       toast.error("Please login to list properties.");
       router.replace("/login");
@@ -206,7 +207,10 @@ export default function Sell() {
       toast.error("Property limit reached. Please upgrade to continue.");
       router.push("/subscription");
     }
-  }, [isAuthenticated, user, router]);
+  }, [isHydrated, isAuthenticated, user, router]);
+
+  // While the store is rehydrating from localStorage, show nothing (avoids flash-redirect)
+  if (!isHydrated) return null;
 
   if (!isAuthenticated || user?.role !== "builder") return null;
 
