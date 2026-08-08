@@ -143,7 +143,7 @@ export default function HeroSection() {
       {/* Main Content */}
       <motion.div
         style={{ y: contentY, opacity }}
-        className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-20"
+        className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 md:pb-24"
       >
         <div className="max-w-4xl mx-auto text-center">
           {/* Headline */}
@@ -308,11 +308,11 @@ export default function HeroSection() {
                     <stat.icon className="w-3.5 h-3.5 text-amber-500/60" />
                   </div>
 
-                  <div className="text-3xl md:text-4xl font-serif font-bold bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent tabular-nums">
+                  <div className="text-3xl md:text-4xl font-serif font-bold text-amber-400 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] tabular-nums">
                     {stat.value}
                   </div>
 
-                  <div className="text-[10px] md:text-xs uppercase tracking-[0.2em] text-white/40 mt-2 font-medium">
+                  <div className="text-[10px] md:text-xs uppercase tracking-[0.2em] text-white/80 mt-2 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                     {stat.label}
                   </div>
                 </motion.div>
