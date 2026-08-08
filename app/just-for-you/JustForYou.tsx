@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { SlidersHorizontal, X, Search, Loader2, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -26,6 +26,9 @@ export default function JustForYou() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { formatPrice, currency, getConvertedPrice, rates } = useCurrency();
+
+  // ── Guard flag: true while we are the ones updating the URL ──
+  const isSelfUpdate = useRef(false);
 
   // ── Initialize filters from URL params ─────────────────
   const [typeFilter, setTypeFilter] = useState<string>(
@@ -69,15 +72,20 @@ export default function JustForYou() {
     return Math.ceil(valueInCurrency / rate);
   };
 
-  // ── Sync URL params → state ──────────────────────────────
+  // ── Sync URL params → state (only for external navigation, e.g. footer links) ──
   useEffect(() => {
+    // Skip when this component itself just updated the URL
+    if (isSelfUpdate.current) {
+      isSelfUpdate.current = false;
+      return;
+    }
     const type = searchParams.get("type");
     const country = searchParams.get("country");
     const city = searchParams.get("city");
-    if (type) setTypeFilter(type);
-    if (country) setCountryFilter(country);
-    if (city) setCityFilter(city);
-    
+    setTypeFilter(type || "all");
+    setCountryFilter(country || "all");
+    setCityFilter(city || "all");
+
     // Restore max price (stored as currency value in URL) → convert to INR
     const maxPriceParam = searchParams.get("max_price");
     if (maxPriceParam) {
@@ -85,6 +93,8 @@ export default function JustForYou() {
       if (!isNaN(parsed) && parsed > 0) {
         setUserMaxPriceINR(getPriceInINR(parsed));
       }
+    } else {
+      setUserMaxPriceINR(null);
     }
   }, [searchParams]);
 
@@ -148,8 +158,6 @@ export default function JustForYou() {
     setCountryFilter("all");
   };
 
-  const searchParamsStr = searchParams.toString();
-
   // ── Update URL when filters change ──────────────────────
   useEffect(() => {
     const params = new URLSearchParams();
@@ -163,10 +171,12 @@ export default function JustForYou() {
     if (minBeds > 0) params.set("bedrooms", minBeds.toString());
 
     const newQuery = params.toString();
-    if (newQuery !== searchParamsStr) {
+    const currentQuery = searchParams.toString();
+    if (newQuery !== currentQuery) {
+      isSelfUpdate.current = true;
       router.replace(`?${newQuery}`, { scroll: false });
     }
-  }, [typeFilter, cityFilter, countryFilter, userMaxPriceINR, sliderValue, minBeds, maxPriceInINR, searchParamsStr, router]);
+  }, [typeFilter, cityFilter, countryFilter, userMaxPriceINR, sliderValue, minBeds, maxPriceInINR]);
 
   return (
     <div className="min-h-screen pt-32 pb-20 bg-[#0A192F] text-white selection:bg-amber-500/30">
