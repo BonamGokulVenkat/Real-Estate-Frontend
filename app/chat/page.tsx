@@ -1046,53 +1046,187 @@ export default function PropertyChatWidget() {
           body: JSON.stringify({ message: query, sessionId }),
           signal: controller.signal,
         });
+        if (!res.ok) {
+          throw new Error(`Server returned HTTP ${res.status}`);
+        }
 
         const newSession = res.headers.get("x-session-id");
         if (newSession) setSessionId(newSession);
 
         setHeaderStatus("Searching vector database…");
+        if (!res.body) {
+          throw new Error("Server returned an empty response body");
+        }
 
-        const reader  = res.body!.getReader();
+        const contentType = res.headers.get("content-type") || "";
+
+        console.log("RAG response:", {
+          status: res.status,
+          contentType,
+          sessionId: res.headers.get("x-session-id"),
+        });
+
+        if (!contentType.includes("text/event-stream")) {
+          const raw = await res.text();
+
+          throw new Error(
+            `Expected SSE response but received ${contentType}: ${raw.slice(0, 500)}`
+          );
+        }
+
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
+
         let buffer = "";
+        let receivedDone = false;
+        let receivedAnything = false;
+
+        const processEvent = (event: string) => {
+          const dataLines = event
+            .split(/\r?\n/)
+            .filter(line => line.startsWith("data:"))
+            .map(line => line.slice(5).trimStart());
+
+          if (!dataLines.length) return;
+
+          const rawData = dataLines.join("\n");
+
+          if (!rawData || rawData === "[DONE]") {
+            receivedDone = true;
+            return;
+          }
+
+          try {
+            const data = JSON.parse(rawData);
+
+            receivedAnything = true;
+
+            console.log("SSE event:", data);
+
+            if (data.type === "properties") {
+              setHeaderStatus("Generating recommendation…");
+              setIsThinking(false);
+
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        properties: Array.isArray(data.properties)
+                          ? data.properties
+                          : [],
+                      }
+                    : m
+                )
+              );
+
+              return;
+            }
+
+            if (data.type === "done") {
+              receivedDone = true;
+
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === aiId
+                    ? { ...m, streaming: false }
+                    : m
+                )
+              );
+
+              return;
+            }
+
+            if (data.type === "error" && typeof data.message === "string") {
+              setIsThinking(false);
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === aiId
+                    ? { ...m, content: m.content + data.message }
+                    : m
+                )
+              );
+              return;
+            }
+
+            if (typeof data.token === "string") {
+              setIsThinking(false);
+
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        content: m.content + data.token,
+                      }
+                    : m
+                )
+              );
+
+              return;
+            }
+
+            if (typeof data.content === "string") {
+              setIsThinking(false);
+
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        content: m.content + data.content,
+                      }
+                    : m
+                )
+              );
+            }
+
+          } catch (error) {
+            console.error("Invalid SSE event:", {
+              rawData,
+              error,
+            });
+          }
+        };
 
         while (true) {
           const { done, value } = await reader.read();
+
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n\n");
-          buffer = lines.pop() || "";
 
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
+          const events = buffer.split(/\r?\n\r?\n/);
 
-              if (data.type === "properties") {
-                setHeaderStatus("Generating recommendation…");
-                setIsThinking(false);
-                setMessages((prev) =>
-                  prev.map((m) => m.id === aiId ? { ...m, properties: data.properties } : m)
-                );
-              } else if (data.type === "done") {
-                setMessages((prev) =>
-                  prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m)
-                );
-              } else if (data.token) {
-                setIsThinking(false);
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId ? { ...m, content: m.content + data.token } : m
-                  )
-                );
-              }
-            } catch {
-              // skip malformed chunks
-            }
+          buffer = events.pop() || "";
+
+          for (const event of events) {
+            processEvent(event);
           }
         }
-      } catch (err: any) {
+
+        // Flush decoder
+        buffer += decoder.decode();
+
+        // Process final event
+        if (buffer.trim()) {
+          processEvent(buffer);
+        }
+
+        console.log("Stream completed:", {
+          receivedAnything,
+          receivedDone,
+        });
+
+        if (!receivedAnything) {
+          throw new Error("Server returned an empty streaming response");
+        }
+
+        if (!receivedDone) {
+          console.warn("Stream ended without a done event");
+        }
+        
+        }catch (err: any) {
         if (err.name !== "AbortError") {
           setMessages((prev) =>
             prev.map((m) =>
@@ -1101,6 +1235,7 @@ export default function PropertyChatWidget() {
                 : m
             )
           );
+          console.log(err);
         }
       } finally {
         setIsStreaming(false);
