@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/price";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -9,7 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 interface PropertyMeta {
   property_id: string;
   title: string;
-  price: number;
+  price: number | string;
   city: string;
   locality?: string;
   property_type: string;
@@ -28,13 +29,6 @@ interface Message {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatPrice(price: number): string {
-  const n = Number(price);
-  if (n >= 10_000_000) return `₹${(n / 10_000_000).toFixed(1)} Cr`;
-  if (n >= 100_000) return `₹${(n / 100_000).toFixed(1)}L`;
-  return `₹${n.toLocaleString("en-IN")}`;
-}
 
 const SUGGESTIONS = [
   "2 BHK under ₹50L in Bangalore",
