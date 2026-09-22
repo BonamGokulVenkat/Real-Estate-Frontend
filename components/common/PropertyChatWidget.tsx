@@ -1,6 +1,8 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { formatPrice } from "@/lib/price";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -900,103 +902,125 @@ function TypingIndicator() {
 }
 
 function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }) {
-  const T_amber = "#D97706";
-
-  const renderInline = (line: string, key: number) => {
-    // Split on **bold** and *italic* markers
-    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
-    return (
-      <span key={key}>
-        {parts.map((part, i) => {
-          if (part.startsWith("**") && part.endsWith("**")) {
-            return <strong key={i} style={{ color: "#fbbf24", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
-          }
-          if (part.startsWith("*") && part.endsWith("*")) {
-            return <em key={i}>{part.slice(1, -1)}</em>;
-          }
-          return <span key={i}>{part}</span>;
-        })}
-      </span>
-    );
-  };
-
-  const lines = text.split("\n");
-  const elements: React.ReactNode[] = [];
-  let i = 0;
-
-  while (i < lines.length) {
-    const line = lines[i];
-
-    // Numbered list item: "1. something"
-    const listMatch = line.match(/^(\d+)\.\s+(.+)/);
-    if (listMatch) {
-      const num = listMatch[1];
-      const content = listMatch[2];
-      elements.push(
-        <div
-          key={i}
-          style={{
-            display: "flex",
-            gap: "10px",
-            alignItems: "flex-start",
-            margin: "6px 0",
-            padding: "8px 10px",
-            background: "rgba(217,119,6,0.06)",
-            borderLeft: `2px solid rgba(217,119,6,0.4)`,
-            borderRadius: "0 6px 6px 0",
-          }}
-        >
-          <span style={{
-            color: T_amber,
-            fontWeight: 700,
-            fontSize: "12px",
-            minWidth: "16px",
-            flexShrink: 0,
-            marginTop: "1px",
-          }}>
-            {num}.
-          </span>
-          <span>{renderInline(content, 0)}</span>
-        </div>
-      );
-      i++;
-      continue;
-    }
-
-    // Empty line → small spacer
-    if (line.trim() === "") {
-      elements.push(<div key={i} style={{ height: "6px" }} />);
-      i++;
-      continue;
-    }
-
-    // Plain paragraph
-    elements.push(
-      <p key={i} style={{ margin: "2px 0", lineHeight: 1.65 }}>
-        {renderInline(line, i)}
-      </p>
-    );
-    i++;
-  }
-
   return (
-    <span>
-      {elements}
+    <div style={{ wordBreak: "break-word" }}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          p: ({ children }) => (
+            <p style={{ margin: "4px 0", lineHeight: 1.65 }}>
+              {children}
+            </p>
+          ),
+          strong: ({ children }) => (
+            <strong style={{ color: "#fbbf24", fontWeight: 700 }}>
+              {children}
+            </strong>
+          ),
+          em: ({ children }) => (
+            <em style={{ fontStyle: "italic", opacity: 0.9 }}>
+              {children}
+            </em>
+          ),
+          h1: ({ children }) => (
+            <h1 style={{ fontSize: "16px", fontWeight: 700, color: "#fbbf24", margin: "10px 0 4px", lineHeight: 1.3 }}>
+              {children}
+            </h1>
+          ),
+          h2: ({ children }) => (
+            <h2 style={{ fontSize: "15px", fontWeight: 700, color: "#fbbf24", margin: "8px 0 4px", lineHeight: 1.3 }}>
+              {children}
+            </h2>
+          ),
+          h3: ({ children }) => (
+            <h3 style={{ fontSize: "14px", fontWeight: 600, color: "#fbbf24", margin: "8px 0 4px", lineHeight: 1.3 }}>
+              {children}
+            </h3>
+          ),
+          h4: ({ children }) => (
+            <h4 style={{ fontSize: "13px", fontWeight: 600, color: "#fbbf24", margin: "6px 0 2px", lineHeight: 1.3 }}>
+              {children}
+            </h4>
+          ),
+          ul: ({ children }) => (
+            <ul style={{ margin: "4px 0 6px", paddingLeft: "18px", listStyleType: "disc" }}>
+              {children}
+            </ul>
+          ),
+          ol: ({ children }) => (
+            <ol style={{ margin: "4px 0 6px", paddingLeft: "18px", listStyleType: "decimal" }}>
+              {children}
+            </ol>
+          ),
+          li: ({ children }) => (
+            <li style={{ margin: "2px 0", lineHeight: 1.55 }}>
+              {children}
+            </li>
+          ),
+          a: ({ href, children }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: "#fbbf24",
+                textDecoration: "underline",
+                textUnderlineOffset: "2px",
+                wordBreak: "break-all",
+              }}
+            >
+              {children}
+            </a>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote
+              style={{
+                borderLeft: `2px solid ${T.amber}`,
+                background: "rgba(217, 119, 6, 0.06)",
+                margin: "6px 0",
+                padding: "6px 10px",
+                borderRadius: "0 6px 6px 0",
+              }}
+            >
+              {children}
+            </blockquote>
+          ),
+          code: ({ children }) => (
+            <code
+              style={{
+                background: "rgba(217, 119, 6, 0.15)",
+                color: "#fbbf24",
+                padding: "1px 5px",
+                borderRadius: "4px",
+                fontSize: "12px",
+                fontFamily: "monospace",
+              }}
+            >
+              {children}
+            </code>
+          ),
+          hr: () => (
+            <hr style={{ border: "none", borderTop: `1px solid ${T.border}`, margin: "10px 0" }} />
+          ),
+        }}
+      >
+        {text}
+      </ReactMarkdown>
       {streaming && (
         <span
           style={{
             display: "inline-block",
             width: "2px",
             height: "13px",
-            background: T_amber,
+            background: T.amber,
             marginLeft: "2px",
             verticalAlign: "text-bottom",
             animation: "curBlink 0.8s step-end infinite",
           }}
-          aria-hidden
+          aria-hidden="true"
         />
       )}
-    </span>
+    </div>
   );
 }
 
