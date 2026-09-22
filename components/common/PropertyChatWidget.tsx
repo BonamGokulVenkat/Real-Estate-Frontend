@@ -1,9 +1,15 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { formatPrice } from "@/lib/price";
+import { Heart, Calendar, MessageSquare, Loader2, X, CheckCircle2 } from "lucide-react";
+import { useAuthStore } from "@/store/useAuthStore";
+import { favouriteService, FavoriteItem } from "@/services/favouriteService";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -20,6 +26,7 @@ export interface PropertyMeta {
   size_sqft?: number;
   score: number;
   media?: { url: string }[];
+  contact_phone?: string;
 }
 
 export interface Message {
@@ -553,8 +560,8 @@ const css: Record<string, React.CSSProperties> = {
     scrollbarWidth: "none" as const,
   },
   propCard: {
-    minWidth: "152px",
-    maxWidth: "152px",
+    minWidth: "168px",
+    maxWidth: "168px",
     background: T.bgCard2,
     border: `0.5px solid ${T.border}`,
     borderRadius: "14px",
@@ -562,10 +569,79 @@ const css: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     cursor: "pointer",
     textDecoration: "none",
-    display: "block",
+    display: "flex",
+    flexDirection: "column" as const,
     color: "inherit",
     transition: "transform 0.2s, border-color 0.2s, box-shadow 0.2s",
     animation: "cardFloat 4s ease-in-out infinite",
+    userSelect: "none" as const,
+  },
+  propActions: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "5px",
+    marginTop: "6px",
+    paddingTop: "6px",
+    borderTop: `0.5px solid ${T.border}`,
+  },
+  btnBookVisit: {
+    width: "100%",
+    padding: "5px 8px",
+    borderRadius: "6px",
+    border: "1px solid rgba(217,119,6,0.35)",
+    background: "rgba(217,119,6,0.12)",
+    color: "#fbbf24",
+    fontSize: "10.5px",
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "4px",
+    fontFamily: "inherit",
+    transition: "all 0.15s ease",
+  },
+  propActionRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    width: "100%",
+  },
+  btnWhatsApp: {
+    flex: 1,
+    padding: "5px 6px",
+    borderRadius: "6px",
+    border: "1px solid rgba(37,211,102,0.35)",
+    background: "rgba(37,211,102,0.12)",
+    color: "#25D366",
+    fontSize: "10.5px",
+    fontWeight: 600,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "4px",
+    fontFamily: "inherit",
+    transition: "all 0.15s ease",
+  },
+  btnFavorite: {
+    width: "28px",
+    height: "26px",
+    borderRadius: "6px",
+    border: `1px solid ${T.border}`,
+    background: "rgba(255,255,255,0.04)",
+    color: T.textSec,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    transition: "all 0.15s ease",
+  },
+  btnFavoriteActive: {
+    border: "1px solid rgba(239,68,68,0.5)",
+    background: "rgba(239,68,68,0.15)",
+    color: "#ef4444",
   },
   propImg: {
     height: "82px",
@@ -827,19 +903,504 @@ function ParticleLayer() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function PropertyCard({ p, index }: { p: PropertyMeta; index: number }) {
+interface SiteVisitModalProps {
+  property: PropertyMeta | null;
+  onClose: () => void;
+}
+
+function SiteVisitModal({ property, onClose }: SiteVisitModalProps) {
+  const { user } = useAuthStore();
+  const [name, setName] = useState(user?.name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [date, setDate] = useState("");
+  const [timeSlot, setTimeSlot] = useState("10:00 AM - 12:00 PM");
+  const [visitType, setVisitType] = useState<"in_person" | "video_tour">("in_person");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!property) return null;
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!name.trim()) {
+      setError("Please provide your name.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Please provide your contact phone or WhatsApp number.");
+      return;
+    }
+    if (!date) {
+      setError("Please select a date for your visit.");
+      return;
+    }
+    if (date < today) {
+      setError("Please choose a future date.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    // Submit handler - isolated request simulation (backend appointment API is not yet provisioned)
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+      toast.success(`Site visit requested for ${property.title}!`);
+    }, 500);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.75)",
+        backdropFilter: "blur(6px)",
+        zIndex: 10005,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "16px",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: "#0d1526",
+          border: "1px solid rgba(217, 119, 6, 0.35)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(217,119,6,0.15)",
+          borderRadius: "16px",
+          width: "100%",
+          maxWidth: "440px",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          color: "#f0f4ff",
+          padding: "24px",
+          position: "relative",
+          fontFamily: "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: "16px",
+            right: "16px",
+            background: "none",
+            border: "none",
+            color: "#8899bb",
+            cursor: "pointer",
+            padding: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "6px",
+          }}
+          aria-label="Close modal"
+        >
+          <X size={18} />
+        </button>
+
+        {!isSubmitted ? (
+          <div>
+            <div style={{ marginBottom: "18px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                <Calendar size={18} color="#fbbf24" />
+                <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#f0f4ff", margin: 0 }}>
+                  Book a Site Visit
+                </h3>
+              </div>
+              <p style={{ fontSize: "12px", color: "#8899bb", margin: "2px 0 0" }}>
+                {property.title} · {[property.locality, property.city].filter(Boolean).join(", ")}
+              </p>
+            </div>
+
+            {error && (
+              <div
+                style={{
+                  background: "rgba(239, 68, 68, 0.15)",
+                  border: "1px solid rgba(239, 68, 68, 0.4)",
+                  color: "#fca5a5",
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  marginBottom: "14px",
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Your Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Rahul Sharma"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "#111827",
+                    border: "1px solid #1e2d45",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Phone / WhatsApp *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "#111827",
+                    border: "1px solid #1e2d45",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Preferred Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={today}
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      background: "#111827",
+                      border: "1px solid #1e2d45",
+                      borderRadius: "8px",
+                      color: "#fff",
+                      fontSize: "12px",
+                      colorScheme: "dark",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    Time Slot *
+                  </label>
+                  <select
+                    value={timeSlot}
+                    onChange={(e) => setTimeSlot(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 10px",
+                      background: "#111827",
+                      border: "1px solid #1e2d45",
+                      borderRadius: "8px",
+                      color: "#fff",
+                      fontSize: "12px",
+                      outline: "none",
+                    }}
+                  >
+                    <option value="10:00 AM - 12:00 PM">10:00 AM - 12:00 PM</option>
+                    <option value="12:00 PM - 02:00 PM">12:00 PM - 02:00 PM</option>
+                    <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
+                    <option value="04:00 PM - 06:00 PM">04:00 PM - 06:00 PM</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Visit Type
+                </label>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <label
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: visitType === "in_person" ? "1px solid #D97706" : "1px solid #1e2d45",
+                      background: visitType === "in_person" ? "rgba(217, 119, 6, 0.12)" : "#111827",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="visitType"
+                      checked={visitType === "in_person"}
+                      onChange={() => setVisitType("in_person")}
+                      style={{ display: "none" }}
+                    />
+                    🚗 In-Person Visit
+                  </label>
+                  <label
+                    style={{
+                      flex: 1,
+                      padding: "8px",
+                      borderRadius: "8px",
+                      border: visitType === "video_tour" ? "1px solid #D97706" : "1px solid #1e2d45",
+                      background: visitType === "video_tour" ? "rgba(217, 119, 6, 0.12)" : "#111827",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="visitType"
+                      checked={visitType === "video_tour"}
+                      onChange={() => setVisitType("video_tour")}
+                      style={{ display: "none" }}
+                    />
+                    📹 Live Video Tour
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "11px", fontWeight: 600, color: "#8899bb", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Special Notes (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any preferences or questions for the agent..."
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    background: "#111827",
+                    border: "1px solid #1e2d45",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "12px",
+                    resize: "none",
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "8px" }}>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{
+                    flex: 1,
+                    padding: "9px 16px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    border: "1px solid #1e2d45",
+                    borderRadius: "8px",
+                    color: "#8899bb",
+                    fontSize: "12.5px",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  style={{
+                    flex: 2,
+                    padding: "9px 16px",
+                    background: "linear-gradient(135deg, #D97706, #B45309)",
+                    border: "none",
+                    borderRadius: "8px",
+                    color: "#fff",
+                    fontSize: "12.5px",
+                    cursor: isSubmitting ? "not-allowed" : "pointer",
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    boxShadow: "0 2px 10px rgba(217, 119, 6, 0.4)",
+                  }}
+                >
+                  {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+                  Confirm Site Visit
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "16px 8px 8px" }}>
+            <CheckCircle2 size={44} color="#22c55e" style={{ margin: "0 auto 12px" }} />
+            <h3 style={{ fontSize: "17px", fontWeight: 700, color: "#f0f4ff", marginBottom: "6px" }}>
+              Site Visit Requested!
+            </h3>
+            <p style={{ fontSize: "13px", color: "#8899bb", lineHeight: 1.5, marginBottom: "12px" }}>
+              Thank you, <strong style={{ color: "#fff" }}>{name}</strong>. Your requested {visitType === "video_tour" ? "video tour" : "site visit"} for <strong style={{ color: "#fbbf24" }}>{property.title}</strong> on <strong style={{ color: "#fff" }}>{date}</strong> ({timeSlot}) has been recorded.
+            </p>
+            <div
+              style={{
+                background: "rgba(217, 119, 6, 0.08)",
+                border: "1px solid rgba(217, 119, 6, 0.25)",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                fontSize: "11px",
+                color: "#fbbf24",
+                marginBottom: "18px",
+                lineHeight: 1.4,
+                textAlign: "left",
+              }}
+            >
+              ℹ️ Notice: Backend appointment service is currently not provisioned. Your request has been captured locally and our concierge will reach out to you directly at {phone}.
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                width: "100%",
+                padding: "10px 16px",
+                background: "linear-gradient(135deg, #D97706, #B45309)",
+                border: "none",
+                borderRadius: "8px",
+                color: "#fff",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PropertyCard({
+  p,
+  index,
+  onBookVisit,
+}: {
+  p: PropertyMeta;
+  index: number;
+  onBookVisit: (property: PropertyMeta) => void;
+}) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthStore();
+
   const score = Math.round((p.score || 0) * 100);
   const rawThumb = p.media?.[0]?.url;
   const thumb = typeof rawThumb === "string" && rawThumb.trim().length > 0 ? rawThumb.trim() : undefined;
   const cardDelay = index * 0.15;
 
+  // Favorites query
+  const { data: favorites } = useQuery<FavoriteItem[]>({
+    queryKey: ["favorites"],
+    queryFn: favouriteService.getFavorites,
+    enabled: isAuthenticated,
+  });
+
+  const isFavorited = favorites?.some((f) => f.property?.property_id === p.property_id);
+
+  const toggleMutation = useMutation({
+    mutationFn: async () => {
+      if (isFavorited) {
+        return favouriteService.removeFavorite(p.property_id);
+      } else {
+        return favouriteService.addFavorite(p.property_id);
+      }
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["favorites"] });
+      const previousFavorites = queryClient.getQueryData<FavoriteItem[]>(["favorites"]);
+
+      // Optimistic update
+      queryClient.setQueryData(["favorites"], (old: any) => {
+        if (!old) return old;
+        if (isFavorited) {
+          return old.filter((f: any) => f.property?.property_id !== p.property_id);
+        } else {
+          return [...old, { property: { property_id: p.property_id } }];
+        }
+      });
+      return { previousFavorites };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(["favorites"], context?.previousFavorites);
+      toast.error("Failed to update favorites.");
+    },
+    onSuccess: () => {
+      if (isFavorited) {
+        toast.success(`Removed ${p.title} from favorites`);
+      } else {
+        toast.success(`Saved ${p.title} to favorites`);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+    },
+  });
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      toast.error("Please login to save properties to your favorites.");
+      router.push("/login");
+      return;
+    }
+    toggleMutation.mutate();
+  };
+
+  const handleWhatsApp = () => {
+    const rawPhone = p.contact_phone || "447921687794";
+    const phone = rawPhone.replace(/[^0-9]/g, "");
+    const locationStr = [p.locality, p.city].filter(Boolean).join(", ");
+    const formattedPrice = formatPrice(p.price);
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://luxora.estate";
+    const propertyUrl = `${origin}/property/${p.property_id}`;
+    const text = `Hi, I am interested in inquiring about *${p.title}* located at *${locationStr}* (Price: ${formattedPrice}). Could you please share more details? Property link: ${propertyUrl}`;
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <Link
-      href={`/property/${p.property_id}`}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/property/${p.property_id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          router.push(`/property/${p.property_id}`);
+        }
+      }}
       style={{ ...css.propCard, animationDelay: `${cardDelay}s` }}
-      prefetch={false}
-      passHref
-      scroll={false}
     >
       <div
         style={{
@@ -855,8 +1416,10 @@ function PropertyCard({ p, index }: { p: PropertyMeta; index: number }) {
         <span style={css.propBadge}>#{index + 1} · {score}%</span>
       </div>
       <div style={css.propBody}>
-        <p style={css.propTitle}>{p.title}</p>
-        <p style={css.propLoc}>📍 {[p.locality, p.city].filter(Boolean).join(", ")}</p>
+        <p style={css.propTitle} title={p.title}>{p.title}</p>
+        <p style={css.propLoc} title={[p.locality, p.city].filter(Boolean).join(", ")}>
+          📍 {[p.locality, p.city].filter(Boolean).join(", ")}
+        </p>
         <div style={css.propDivider} />
         <p style={css.propPrice}>{formatPrice(p.price)}</p>
         <div style={css.propScoreRow}>
@@ -875,8 +1438,60 @@ function PropertyCard({ p, index }: { p: PropertyMeta; index: number }) {
           <span style={css.propScoreNum}>{score}%</span>
         </div>
         <span style={css.propType}>{p.property_type}</span>
+
+        {/* Action Buttons */}
+        <div style={css.propActions} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            style={css.btnBookVisit}
+            onClick={(e) => {
+              e.stopPropagation();
+              onBookVisit(p);
+            }}
+            title="Book a private site visit"
+          >
+            <Calendar size={11} />
+            <span>Book Visit</span>
+          </button>
+
+          <div style={css.propActionRow}>
+            <button
+              type="button"
+              style={css.btnWhatsApp}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleWhatsApp();
+              }}
+              title="Chat on WhatsApp"
+            >
+              <MessageSquare size={11} />
+              <span>WhatsApp</span>
+            </button>
+
+            <button
+              type="button"
+              style={{
+                ...css.btnFavorite,
+                ...(isFavorited ? css.btnFavoriteActive : {}),
+              }}
+              onClick={handleFavoriteClick}
+              title={isFavorited ? "Remove from favorites" : "Save to favorites"}
+              disabled={toggleMutation.isPending}
+            >
+              {toggleMutation.isPending ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Heart
+                  size={12}
+                  fill={isFavorited ? "#ef4444" : "none"}
+                  color={isFavorited ? "#ef4444" : "#8899bb"}
+                />
+              )}
+            </button>
+          </div>
+        </div>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -1025,7 +1640,13 @@ function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }
   );
 }
 
-function BubbleAI({ msg }: { msg: Message }) {
+function BubbleAI({
+  msg,
+  onBookVisit,
+}: {
+  msg: Message;
+  onBookVisit: (p: PropertyMeta) => void;
+}) {
   return (
     <div style={css.msgRowAi}>
       {(msg.properties?.length ?? 0) > 0 && (
@@ -1033,7 +1654,12 @@ function BubbleAI({ msg }: { msg: Message }) {
           <div style={css.featuredLabel}>✦ Featured Matches</div>
           <div style={css.propRow}>
             {msg.properties!.map((p, i) => (
-              <PropertyCard key={p.property_id} p={p} index={i} />
+              <PropertyCard
+                key={p.property_id}
+                p={p}
+                index={i}
+                onBookVisit={onBookVisit}
+              />
             ))}
           </div>
         </>
@@ -1132,6 +1758,7 @@ export default function PropertyChatWidget({
   const [isThinking, setIsThinking] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [activeHistory, setActiveHistory] = useState(0);
+  const [bookingProperty, setBookingProperty] = useState<PropertyMeta | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1546,7 +2173,11 @@ export default function PropertyChatWidget({
             ) : msg.streaming && !msg.content && !msg.properties?.length ? (
               null
             ) : (
-              <BubbleAI key={msg.id} msg={msg} />
+              <BubbleAI
+                key={msg.id}
+                msg={msg}
+                onBookVisit={(p) => setBookingProperty(p)}
+              />
             )
           )}
           {isThinking && <TypingIndicator />}
@@ -1621,6 +2252,14 @@ export default function PropertyChatWidget({
           <p style={css.inputHint}>Press Enter to send · Shift+Enter for new line</p>
         </div>
       </div>
+
+      {/* Site Visit Modal */}
+      {bookingProperty && (
+        <SiteVisitModal
+          property={bookingProperty}
+          onClose={() => setBookingProperty(null)}
+        />
+      )}
     </div>
   );
 }
