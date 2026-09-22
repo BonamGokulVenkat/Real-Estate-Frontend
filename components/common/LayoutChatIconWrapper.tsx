@@ -1,15 +1,30 @@
-"use client"
+"use client";
 
-import { usePathname } from 'next/navigation';
-import FloatingChatButton from './FloatingChatIcon';
+import { useState } from "react";
+import { usePathname } from "next/navigation";
+import FloatingChatButton from "./FloatingChatIcon";
+import PropertyChatWidget from "./PropertyChatWidget";
 
+export default function LayoutChatIconWrapper() {
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
 
-export default function LayoutChatIconWrapper(){
-    const pathname = usePathname();
-    
-    if(pathname === '/chat' || pathname === '/chat/'){
-        return null;
-    }
+  if (pathname === "/chat" || pathname === "/chat/") {
+    return null;
+  }
 
-    return <FloatingChatButton/>
+  return (
+    <>
+      {isOpen && (
+        <PropertyChatWidget
+          isFullScreen={false}
+          onClose={() => setIsOpen(false)}
+        />
+      )}
+      <FloatingChatButton
+        isOpen={isOpen}
+        onClick={() => setIsOpen((prev) => !prev)}
+      />
+    </>
+  );
 }

@@ -45,6 +45,10 @@ interface FloatingChatButtonProps {
   position?: "bottom-right" | "bottom-left";
   /** If true, the component completely disappears from the page */
   hide?: boolean;
+  /** Whether the chat widget is currently open */
+  isOpen?: boolean;
+  /** Click handler to toggle chat widget open/close */
+  onClick?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -56,6 +60,8 @@ export default function FloatingChatButton({
   label = "Chat with Luxora AI",
   position = "bottom-right",
   hide = false, // Defaults to false so it shows normally
+  isOpen = false,
+  onClick,
 }: FloatingChatButtonProps) {
   const [mounted, setMounted] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -80,10 +86,15 @@ export default function FloatingChatButton({
     };
   }, [hide]);
 
-  // Click handler to run ripple effect and redirect
+  // Click handler to run ripple effect and trigger callback or redirect
   const handleClick = () => {
     setRippling(true);
     setTimeout(() => setRippling(false), 600);
+
+    if (onClick) {
+      onClick();
+      return;
+    }
 
     if (newTab) {
       window.open(chatPath, "_blank", "noopener,noreferrer");
@@ -129,7 +140,7 @@ export default function FloatingChatButton({
             order: isRight ? -1 : 1,
           }}
         >
-          {label}
+          {isOpen ? "Close chat" : label}
           {/* Arrow pointing toward button */}
           <span
             style={{
@@ -180,8 +191,8 @@ export default function FloatingChatButton({
           onClick={handleClick}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          aria-label={label}
-          title={label}
+          aria-label={isOpen ? "Close chat" : label}
+          title={isOpen ? "Close chat" : label}
           style={{
             width: "58px",
             height: "58px",
@@ -203,39 +214,58 @@ export default function FloatingChatButton({
             flexShrink: 0,
           }}
         >
-          {/* House icon */}
-          <svg
-            width="26"
-            height="26"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#fff"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              transition: "transform 0.2s",
-              transform: hovered ? "scale(1.12)" : "scale(1)",
-            }}
-            aria-hidden
-          >
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
+          {isOpen ? (
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#fff"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <>
+              {/* House icon */}
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#fff"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  transition: "transform 0.2s",
+                  transform: hovered ? "scale(1.12)" : "scale(1)",
+                }}
+                aria-hidden
+              >
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
 
-          {/* Chat bubble dot overlay */}
-          <span
-            style={{
-              position: "absolute",
-              bottom: "10px",
-              right: "10px",
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              background: "#fff",
-              opacity: 0.9,
-            }}
-          />
+              {/* Chat bubble dot overlay */}
+              <span
+                style={{
+                  position: "absolute",
+                  bottom: "10px",
+                  right: "10px",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "#fff",
+                  opacity: 0.9,
+                }}
+              />
+            </>
+          )}
         </button>
 
         {/* Unread badge */}

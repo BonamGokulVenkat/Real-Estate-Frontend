@@ -7,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PropertyMeta {
+export interface PropertyMeta {
   property_id: string;
   title: string;
   price: number | string;
@@ -20,12 +20,20 @@ interface PropertyMeta {
   media?: { url: string }[];
 }
 
-interface Message {
+export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   properties?: PropertyMeta[];
   streaming?: boolean;
+}
+
+export interface PropertyChatWidgetProps {
+  /** When true, renders as full-screen page. When false, renders as floating popup widget. */
+  isFullScreen?: boolean;
+  /** Callback fired when the widget close button is clicked in floating mode. */
+  onClose?: () => void;
+  className?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,7 +55,6 @@ const HISTORY = [
 // ─── Keyframe injection ───────────────────────────────────────────────────────
 
 const KEYFRAMES = `
-html, body { margin: 0 !important; padding: 0 !important; height: 100%; overflow: hidden; }
 * { box-sizing: border-box; }
 
 @keyframes floatLogo {
@@ -99,6 +106,21 @@ html, body { margin: 0 !important; padding: 0 !important; height: 100%; overflow
   70%     { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
 }
 @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+@media (max-width: 640px) {
+  .luxora-chat-floating {
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100vw !important;
+    height: 100% !important;
+    max-width: 100vw !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+}
 `;
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -123,7 +145,7 @@ const T = {
 // ─── Inline Styles ────────────────────────────────────────────────────────────
 
 const css: Record<string, React.CSSProperties> = {
-  host: {
+  hostFullscreen: {
     display: "flex",
     position: "fixed" as const,
     inset: 0,
@@ -135,6 +157,27 @@ const css: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     margin: 0,
     padding: 0,
+    zIndex: 1000,
+  },
+
+  hostFloating: {
+    display: "flex",
+    position: "fixed" as const,
+    bottom: "96px",
+    right: "28px",
+    width: "420px",
+    maxWidth: "calc(100vw - 36px)",
+    height: "620px",
+    maxHeight: "calc(100vh - 120px)",
+    fontFamily: "var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif)",
+    background: T.bgBase,
+    color: T.textPri,
+    borderRadius: "16px",
+    border: `1px solid ${T.borderGlow}`,
+    boxShadow: "0 12px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(217,119,6,0.25)",
+    overflow: "hidden",
+    zIndex: 9998,
+    flexDirection: "column" as const,
   },
 
   // Ambient particles canvas layer
@@ -297,7 +340,7 @@ const css: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "0 20px",
+    padding: "0 16px",
     flexShrink: 0,
     background: "rgba(13,21,38,0.95)",
     backdropFilter: "blur(8px)",
@@ -306,6 +349,7 @@ const css: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "10px",
+    minWidth: 0,
   },
   topbarAvatar: {
     width: "30px",
@@ -321,10 +365,13 @@ const css: Record<string, React.CSSProperties> = {
     boxShadow: "0 2px 12px rgba(217,119,6,0.4)",
   },
   topbarTitle: {
-    fontSize: "14px",
+    fontSize: "13.5px",
     fontWeight: 600,
     color: T.textPri,
     letterSpacing: "-0.2px",
+    whiteSpace: "nowrap" as const,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
   },
   statusBadge: {
     fontSize: "10px",
@@ -332,11 +379,12 @@ const css: Record<string, React.CSSProperties> = {
     color: T.greenLight,
     border: "0.5px solid rgba(34,197,94,0.3)",
     borderRadius: "999px",
-    padding: "3px 10px",
+    padding: "2px 8px",
     display: "flex",
     alignItems: "center",
     gap: "5px",
     fontWeight: 500,
+    flexShrink: 0,
   },
   statusBadgeThinking: {
     fontSize: "10px",
@@ -344,11 +392,12 @@ const css: Record<string, React.CSSProperties> = {
     color: "#fbbf24",
     border: "0.5px solid rgba(217,119,6,0.3)",
     borderRadius: "999px",
-    padding: "3px 10px",
+    padding: "2px 8px",
     display: "flex",
     alignItems: "center",
     gap: "5px",
     fontWeight: 500,
+    flexShrink: 0,
   },
   statusDotGreen: {
     width: "6px",
@@ -366,10 +415,28 @@ const css: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     animation: "blinkDot 0.8s ease-in-out infinite",
   },
+  topbarActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    flexShrink: 0,
+  },
+  iconBtn: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: T.textMuted,
+    padding: "6px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "8px",
+    transition: "color 0.15s, background 0.15s",
+  },
 
   // ── RAG strip ─────────────────────────────────────────────────────────────
   ragStrip: {
-    padding: "5px 20px",
+    padding: "5px 16px",
     background: "linear-gradient(90deg,rgba(217,119,6,0.05),rgba(217,119,6,0.02))",
     borderBottom: "0.5px solid rgba(217,119,6,0.1)",
     display: "flex",
@@ -395,10 +462,10 @@ const css: Record<string, React.CSSProperties> = {
   messages: {
     flex: 1,
     overflowY: "auto" as const,
-    padding: "20px 20px 8px",
+    padding: "16px 16px 8px",
     display: "flex",
     flexDirection: "column",
-    gap: "18px",
+    gap: "16px",
     scrollbarWidth: "thin" as const,
   },
   msgRowAi: {
@@ -407,6 +474,7 @@ const css: Record<string, React.CSSProperties> = {
     alignItems: "flex-start",
     gap: "8px",
     animation: "fadeSlideUp 0.25s ease-out",
+    maxWidth: "100%",
   },
   msgRowUser: {
     display: "flex",
@@ -414,6 +482,7 @@ const css: Record<string, React.CSSProperties> = {
     alignItems: "flex-end",
     gap: "6px",
     animation: "fadeSlideUp 0.25s ease-out",
+    maxWidth: "100%",
   },
   msgMeta: {
     display: "flex",
@@ -423,8 +492,8 @@ const css: Record<string, React.CSSProperties> = {
     color: T.textMuted,
   },
   aiAvatarSm: {
-    width: "26px",
-    height: "26px",
+    width: "24px",
+    height: "24px",
     borderRadius: "7px",
     background: "linear-gradient(145deg, #e8a020, #B45309)",
     display: "flex",
@@ -436,11 +505,10 @@ const css: Record<string, React.CSSProperties> = {
     boxShadow: "0 2px 8px rgba(217,119,6,0.35)",
   },
   bubbleAi: {
-    maxWidth: "82%",
-    padding: "12px 16px",
-    fontSize: "13.5px",
-    lineHeight: 1.65,
-    whiteSpace: "pre-wrap" as const,
+    maxWidth: "88%",
+    padding: "12px 15px",
+    fontSize: "13px",
+    lineHeight: 1.6,
     wordBreak: "break-word" as const,
     background: T.bgCard,
     border: `0.5px solid ${T.border}`,
@@ -448,16 +516,16 @@ const css: Record<string, React.CSSProperties> = {
     color: T.textPri,
   },
   bubbleUser: {
-    maxWidth: "82%",
-    padding: "11px 16px",
-    fontSize: "13.5px",
-    lineHeight: 1.65,
+    maxWidth: "88%",
+    padding: "10px 14px",
+    fontSize: "13px",
+    lineHeight: 1.55,
     whiteSpace: "pre-wrap" as const,
     wordBreak: "break-word" as const,
     background: "linear-gradient(135deg, #D97706, #B45309)",
     borderRadius: "14px 14px 4px 14px",
     color: "#fff",
-    boxShadow: "0 4px 20px rgba(217,119,6,0.3)",
+    boxShadow: "0 4px 18px rgba(217,119,6,0.3)",
   },
 
   // ── Property cards ────────────────────────────────────────────────────────
@@ -479,6 +547,7 @@ const css: Record<string, React.CSSProperties> = {
     overflowX: "auto" as const,
     paddingBottom: "6px",
     width: "100%",
+    maxWidth: "100%",
     scrollbarWidth: "none" as const,
   },
   propCard: {
@@ -597,7 +666,7 @@ const css: Record<string, React.CSSProperties> = {
     background: T.bgCard,
     border: `0.5px solid ${T.border}`,
     borderRadius: "4px 14px 14px 14px",
-    padding: "14px 18px",
+    padding: "12px 16px",
     display: "flex",
     gap: "5px",
     alignItems: "center",
@@ -612,14 +681,14 @@ const css: Record<string, React.CSSProperties> = {
   // ── Suggestions ───────────────────────────────────────────────────────────
   suggestions: {
     display: "flex",
-    gap: "7px",
+    gap: "6px",
     flexWrap: "wrap" as const,
-    padding: "4px 20px 10px",
+    padding: "4px 16px 8px",
     flexShrink: 0,
   },
   chip: {
-    fontSize: "11.5px",
-    padding: "6px 13px",
+    fontSize: "11px",
+    padding: "5px 11px",
     borderRadius: "999px",
     border: "0.5px solid rgba(217,119,6,0.3)",
     background: "rgba(217,119,6,0.06)",
@@ -634,18 +703,18 @@ const css: Record<string, React.CSSProperties> = {
   // ── Input ─────────────────────────────────────────────────────────────────
   inputArea: {
     borderTop: `0.5px solid ${T.border}`,
-    padding: "12px 20px 14px",
+    padding: "10px 16px 12px",
     background: T.bgPanel,
     flexShrink: 0,
   },
   inputBox: {
     display: "flex",
     alignItems: "flex-end",
-    gap: "10px",
+    gap: "8px",
     background: T.bgCard,
     border: `0.5px solid ${T.border}`,
-    borderRadius: "14px",
-    padding: "10px 12px",
+    borderRadius: "12px",
+    padding: "8px 10px",
     transition: "border-color 0.2s",
   },
   textarea: {
@@ -653,19 +722,19 @@ const css: Record<string, React.CSSProperties> = {
     background: "transparent",
     border: "none",
     outline: "none",
-    fontSize: "13.5px",
+    fontSize: "13px",
     color: T.textPri,
     fontFamily: "inherit",
     resize: "none" as const,
     lineHeight: 1.5,
-    maxHeight: "120px",
+    maxHeight: "100px",
     minHeight: "22px",
     height: "22px",
   },
   sendBtn: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "10px",
+    width: "32px",
+    height: "32px",
+    borderRadius: "9px",
     background: "linear-gradient(135deg, #D97706, #B45309)",
     border: "none",
     cursor: "pointer",
@@ -674,53 +743,82 @@ const css: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     flexShrink: 0,
     color: "#fff",
-    fontSize: "14px",
+    fontSize: "13px",
     transition: "opacity 0.15s, transform 0.1s",
     boxShadow: "0 2px 12px rgba(217,119,6,0.4)",
   },
   inputHint: {
-    fontSize: "10.5px",
+    fontSize: "10px",
     color: T.textMuted,
-    marginTop: "7px",
+    marginTop: "6px",
     textAlign: "center" as const,
   },
 };
 
-// ─── Ambient Particles ────────────────────────────────────────────────────────
+interface ParticleConfig {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  delay: number;
+  dur: number;
+  opacity: number;
+}
+
+const PARTICLES: ParticleConfig[] = [
+  { x: 12, y: 85, dx: -15, dy: -45, delay: 0.5, dur: 7.2, opacity: 0.45 },
+  { x: 28, y: 40, dx: 22,  dy: -55, delay: 2.1, dur: 8.5, opacity: 0.60 },
+  { x: 45, y: 92, dx: -8,  dy: -38, delay: 1.4, dur: 6.8, opacity: 0.35 },
+  { x: 62, y: 70, dx: 30,  dy: -60, delay: 3.2, dur: 9.1, opacity: 0.55 },
+  { x: 80, y: 25, dx: -18, dy: -42, delay: 0.8, dur: 7.9, opacity: 0.50 },
+  { x: 94, y: 65, dx: -25, dy: -50, delay: 4.0, dur: 8.0, opacity: 0.40 },
+  { x: 8,  y: 30, dx: 14,  dy: -35, delay: 1.9, dur: 6.5, opacity: 0.65 },
+  { x: 35, y: 78, dx: -12, dy: -48, delay: 2.7, dur: 7.6, opacity: 0.42 },
+  { x: 52, y: 15, dx: 18,  dy: -52, delay: 0.2, dur: 8.8, opacity: 0.58 },
+  { x: 71, y: 88, dx: -20, dy: -40, delay: 3.8, dur: 7.0, opacity: 0.38 },
+  { x: 88, y: 50, dx: 10,  dy: -62, delay: 1.1, dur: 9.4, opacity: 0.62 },
+  { x: 20, y: 60, dx: -22, dy: -36, delay: 4.5, dur: 6.9, opacity: 0.48 },
+  { x: 38, y: 20, dx: 25,  dy: -58, delay: 2.4, dur: 8.2, opacity: 0.52 },
+  { x: 58, y: 82, dx: -14, dy: -44, delay: 1.6, dur: 7.4, opacity: 0.44 },
+  { x: 76, y: 38, dx: 16,  dy: -54, delay: 3.5, dur: 8.6, opacity: 0.56 },
+  { x: 90, y: 90, dx: -30, dy: -46, delay: 0.9, dur: 7.1, opacity: 0.36 },
+  { x: 15, y: 10, dx: 12,  dy: -32, delay: 2.8, dur: 6.4, opacity: 0.68 },
+  { x: 84, y: 75, dx: -16, dy: -56, delay: 4.2, dur: 9.0, opacity: 0.46 },
+];
 
 function ParticleLayer() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   return (
     <div style={css.particleLayer}>
-      {Array.from({ length: 18 }).map((_, i) => {
-        const x = Math.random() * 100;
-        const y = Math.random() * 100;
-        const dx = (Math.random() - 0.5) * 80;
-        const dy = -(Math.random() * 60 + 20);
-        const delay = Math.random() * 6;
-        const dur = 5 + Math.random() * 5;
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              width: "2px",
-              height: "2px",
-              borderRadius: "50%",
-              background: T.amber,
-              left: `${x}%`,
-              top: `${y}%`,
-              opacity: 0.3 + Math.random() * 0.4,
-              animationName: "particleDrift",
-              animationDuration: `${dur}s`,
-              animationDelay: `${delay}s`,
-              animationTimingFunction: "ease-out",
-              animationIterationCount: "infinite",
-              ["--dx" as any]: `${dx}px`,
-              ["--dy" as any]: `${dy}px`,
-            }}
-          />
-        );
-      })}
+      {PARTICLES.map((p, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            width: "2px",
+            height: "2px",
+            borderRadius: "50%",
+            background: T.amber,
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            opacity: p.opacity,
+            animationName: "particleDrift",
+            animationDuration: `${p.dur}s`,
+            animationDelay: `${p.delay}s`,
+            animationTimingFunction: "ease-out",
+            animationIterationCount: "infinite",
+            ["--dx" as any]: `${p.dx}px`,
+            ["--dy" as any]: `${p.dy}px`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -801,6 +899,107 @@ function TypingIndicator() {
   );
 }
 
+function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }) {
+  const T_amber = "#D97706";
+
+  const renderInline = (line: string, key: number) => {
+    // Split on **bold** and *italic* markers
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return (
+      <span key={key}>
+        {parts.map((part, i) => {
+          if (part.startsWith("**") && part.endsWith("**")) {
+            return <strong key={i} style={{ color: "#fbbf24", fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith("*") && part.endsWith("*")) {
+            return <em key={i}>{part.slice(1, -1)}</em>;
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  };
+
+  const lines = text.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Numbered list item: "1. something"
+    const listMatch = line.match(/^(\d+)\.\s+(.+)/);
+    if (listMatch) {
+      const num = listMatch[1];
+      const content = listMatch[2];
+      elements.push(
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "flex-start",
+            margin: "6px 0",
+            padding: "8px 10px",
+            background: "rgba(217,119,6,0.06)",
+            borderLeft: `2px solid rgba(217,119,6,0.4)`,
+            borderRadius: "0 6px 6px 0",
+          }}
+        >
+          <span style={{
+            color: T_amber,
+            fontWeight: 700,
+            fontSize: "12px",
+            minWidth: "16px",
+            flexShrink: 0,
+            marginTop: "1px",
+          }}>
+            {num}.
+          </span>
+          <span>{renderInline(content, 0)}</span>
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Empty line → small spacer
+    if (line.trim() === "") {
+      elements.push(<div key={i} style={{ height: "6px" }} />);
+      i++;
+      continue;
+    }
+
+    // Plain paragraph
+    elements.push(
+      <p key={i} style={{ margin: "2px 0", lineHeight: 1.65 }}>
+        {renderInline(line, i)}
+      </p>
+    );
+    i++;
+  }
+
+  return (
+    <span>
+      {elements}
+      {streaming && (
+        <span
+          style={{
+            display: "inline-block",
+            width: "2px",
+            height: "13px",
+            background: T_amber,
+            marginLeft: "2px",
+            verticalAlign: "text-bottom",
+            animation: "curBlink 0.8s step-end infinite",
+          }}
+          aria-hidden
+        />
+      )}
+    </span>
+  );
+}
+
 function BubbleAI({ msg }: { msg: Message }) {
   return (
     <div style={css.msgRowAi}>
@@ -819,21 +1018,7 @@ function BubbleAI({ msg }: { msg: Message }) {
         <span>Luxora AI</span>
       </div>
       <div style={css.bubbleAi}>
-        {msg.content}
-        {msg.streaming && (
-          <span
-            style={{
-              display: "inline-block",
-              width: "2px",
-              height: "13px",
-              background: T.amber,
-              marginLeft: "2px",
-              verticalAlign: "text-bottom",
-              animation: "curBlink 0.8s step-end infinite",
-            }}
-            aria-hidden
-          />
-        )}
+        <MarkdownText text={msg.content} streaming={msg.streaming} />
       </div>
     </div>
   );
@@ -901,7 +1086,11 @@ function Sidebar({
 
 // ─── Main Widget ──────────────────────────────────────────────────────────────
 
-export default function PropertyChatWidget() {
+export default function PropertyChatWidget({
+  isFullScreen = true,
+  onClose,
+  className,
+}: PropertyChatWidgetProps = {}) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -931,8 +1120,23 @@ export default function PropertyChatWidget() {
     const style = document.createElement("style");
     style.textContent = KEYFRAMES;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(style); };
+    return () => {
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    };
   }, []);
+
+  // Lock body scroll only when running in full screen mode
+  useEffect(() => {
+    if (isFullScreen) {
+      const origOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = origOverflow;
+      };
+    }
+  }, [isFullScreen]);
 
   const handleNewChat = () => {
     setMessages([
@@ -991,66 +1195,191 @@ export default function PropertyChatWidget() {
           signal: controller.signal,
         });
 
+        if (!res.ok) {
+          let errorMsg = `Server returned HTTP ${res.status}`;
+          try {
+            const errData = await res.json();
+            if (errData?.message) {
+              errorMsg = typeof errData.message === "string" ? errData.message : JSON.stringify(errData.message);
+            }
+          } catch {
+            // response was not JSON
+          }
+          throw new Error(errorMsg);
+        }
+
         const newSession = res.headers.get("x-session-id");
         if (newSession) setSessionId(newSession);
 
         setHeaderStatus("Searching vector database…");
 
-        const reader  = res.body!.getReader();
+        if (!res.body) {
+          throw new Error("Server returned an empty response body");
+        }
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("text/event-stream")) {
+          const raw = await res.text();
+          throw new Error(
+            `Expected SSE response but received ${contentType}: ${raw.slice(0, 500)}`
+          );
+        }
+
+        const reader = res.body.getReader();
         const decoder = new TextDecoder();
+
         let buffer = "";
+        let receivedDone = false;
+        let receivedAnything = false;
+
+        const processEvent = (event: string) => {
+          const dataLines = event
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart());
+
+          if (!dataLines.length) return;
+
+          const rawData = dataLines.join("\n");
+
+          if (!rawData || rawData === "[DONE]") {
+            receivedDone = true;
+            return;
+          }
+
+          try {
+            const data = JSON.parse(rawData);
+            receivedAnything = true;
+
+            if (data.type === "properties") {
+              setHeaderStatus("Generating recommendation…");
+              setIsThinking(false);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        properties: Array.isArray(data.properties)
+                          ? data.properties
+                          : [],
+                      }
+                    : m
+                )
+              );
+              return;
+            }
+
+            if (data.type === "done") {
+              receivedDone = true;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId ? { ...m, streaming: false } : m
+                )
+              );
+              return;
+            }
+
+            if (data.type === "error") {
+              setIsThinking(false);
+              const errMsg =
+                typeof data.message === "string"
+                  ? data.message
+                  : "An error occurred while generating recommendations.";
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        content: m.content ? `${m.content}\n\n${errMsg}` : errMsg,
+                        streaming: false,
+                      }
+                    : m
+                )
+              );
+              return;
+            }
+
+            if (typeof data.token === "string") {
+              setIsThinking(false);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? { ...m, content: m.content + data.token }
+                    : m
+                )
+              );
+              return;
+            }
+
+            if (typeof data.content === "string") {
+              setIsThinking(false);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? { ...m, content: m.content + data.content }
+                    : m
+                )
+              );
+              return;
+            }
+          } catch (error) {
+            console.error("Invalid SSE event:", { rawData, error });
+          }
+        };
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n\n");
-          buffer = lines.pop() || "";
+          const events = buffer.split(/\r?\n\r?\n/);
+          buffer = events.pop() || "";
 
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === "properties") {
-                setHeaderStatus("Generating recommendation…");
-                setIsThinking(false);
-                setMessages((prev) =>
-                  prev.map((m) => m.id === aiId ? { ...m, properties: data.properties } : m)
-                );
-              } else if (data.type === "done") {
-                setMessages((prev) =>
-                  prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m)
-                );
-              } else if (data.token) {
-                setIsThinking(false);
-                setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === aiId ? { ...m, content: m.content + data.token } : m
-                  )
-                );
-              }
-            } catch {
-              // skip malformed chunks
-            }
+          for (const event of events) {
+            processEvent(event);
           }
+        }
+
+        // Flush decoder
+        buffer += decoder.decode();
+
+        // Process final event
+        if (buffer.trim()) {
+          processEvent(buffer);
+        }
+
+        if (!receivedAnything) {
+          throw new Error("Server returned an empty streaming response");
+        }
+
+        if (!receivedDone) {
+          console.warn("Stream ended without a done event");
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
+          const errorMessage =
+            err.message && typeof err.message === "string" && !err.message.includes("fetch")
+              ? err.message
+              : "Sorry, something went wrong. Please try again.";
+
           setMessages((prev) =>
             prev.map((m) =>
               m.id === aiId
-                ? { ...m, content: "Sorry, something went wrong. Please try again.", streaming: false }
+                ? {
+                    ...m,
+                    content: m.content || errorMessage,
+                    streaming: false,
+                  }
                 : m
             )
           );
+          console.error("Chat error:", err);
         }
       } finally {
         setIsStreaming(false);
         setIsThinking(false);
         setMessages((prev) =>
-          prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m)
+          prev.map((m) => (m.id === aiId ? { ...m, streaming: false } : m))
         );
         setHeaderStatus("Ready");
         inputRef.current?.focus();
@@ -1060,55 +1389,94 @@ export default function PropertyChatWidget() {
   );
 
   return (
-    <div style={css.host}>
+    <div
+      style={isFullScreen ? css.hostFullscreen : css.hostFloating}
+      className={`${!isFullScreen ? "luxora-chat-floating" : ""} ${className || ""}`}
+    >
       <ParticleLayer />
 
-      <Sidebar
-        onNewChat={handleNewChat}
-        activeIdx={activeHistory}
-        setActiveIdx={setActiveHistory}
-      />
+      {/* Sidebar - displayed in full-screen mode */}
+      {isFullScreen && (
+        <Sidebar
+          onNewChat={handleNewChat}
+          activeIdx={activeHistory}
+          setActiveIdx={setActiveHistory}
+        />
+      )}
 
       <div style={css.main}>
         {/* Topbar */}
         <div style={css.topbar}>
           <div style={css.topbarLeft}>
             <div style={css.topbarAvatar}>🏠</div>
-            <span style={css.topbarTitle}>Luxora Property Advisor</span>
+            <span style={css.topbarTitle}>
+              {isFullScreen ? "Luxora Property Advisor" : "Luxora AI"}
+            </span>
             <span style={isThinking ? css.statusBadgeThinking : css.statusBadge}>
               <span style={isThinking ? css.statusDotAmber : css.statusDotGreen} aria-hidden />
               {headerStatus}
             </span>
           </div>
-          <button
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: T.textMuted,
-              padding: "6px",
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "8px",
-            }}
-            onClick={handleNewChat}
-            title="New chat"
-            aria-label="Start new chat"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-          </button>
+
+          <div style={css.topbarActions}>
+            {/* New chat button */}
+            <button
+              style={css.iconBtn}
+              onClick={handleNewChat}
+              title="New search"
+              aria-label="Start new chat"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+
+            {/* Expand to full page (in floating mode) */}
+            {!isFullScreen && (
+              <Link
+                href="/chat"
+                style={css.iconBtn}
+                title="Open in full page"
+                aria-label="Open chat page"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
+                </svg>
+              </Link>
+            )}
+
+            {/* Close button (in floating mode or if onClose callback provided) */}
+            {onClose && (
+              <button
+                style={css.iconBtn}
+                onClick={onClose}
+                title="Close chat"
+                aria-label="Close chat"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* RAG strip */}
-        <div style={css.ragStrip}>
-          <div style={css.ragDot} />
-          <span style={css.ragText}>
-            Semantic vector search · Retrieval-augmented generation · Session memory
-          </span>
-        </div>
+        {/* RAG strip - displayed in full-screen mode */}
+        {isFullScreen && (
+          <div style={css.ragStrip}>
+            <div style={css.ragDot} />
+            <span style={css.ragText}>
+              Semantic vector search · Retrieval-augmented generation · Session memory
+            </span>
+          </div>
+        )}
 
         {/* Messages */}
         <div
@@ -1118,9 +1486,13 @@ export default function PropertyChatWidget() {
           aria-label="Chat messages"
         >
           {messages.map((msg) =>
-            msg.role === "user"
-              ? <BubbleUser key={msg.id} msg={msg} />
-              : <BubbleAI   key={msg.id} msg={msg} />
+            msg.role === "user" ? (
+              <BubbleUser key={msg.id} msg={msg} />
+            ) : msg.streaming && !msg.content && !msg.properties?.length ? (
+              null
+            ) : (
+              <BubbleAI key={msg.id} msg={msg} />
+            )
           )}
           {isThinking && <TypingIndicator />}
           <div ref={bottomRef} />
@@ -1179,11 +1551,11 @@ export default function PropertyChatWidget() {
               aria-label="Send message"
             >
               {isStreaming ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff" aria-hidden>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden>
                   <rect x="6" y="6" width="12" height="12" rx="2" />
                 </svg>
               ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <line x1="22" y1="2" x2="11" y2="13" />
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
