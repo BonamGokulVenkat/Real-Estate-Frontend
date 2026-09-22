@@ -1111,6 +1111,7 @@ export default function PropertyChatWidget({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1137,6 +1138,34 @@ export default function PropertyChatWidget({
       };
     }
   }, [isFullScreen]);
+
+  // Close floating widget on click outside
+  useEffect(() => {
+    if (isFullScreen || !onClose) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (widgetRef.current && widgetRef.current.contains(target)) {
+        return;
+      }
+      if (target.closest?.('[data-fcb-btn="1"]')) {
+        return;
+      }
+      onClose();
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [isFullScreen, onClose]);
 
   const handleNewChat = () => {
     setMessages([
@@ -1390,6 +1419,7 @@ export default function PropertyChatWidget({
 
   return (
     <div
+      ref={widgetRef}
       style={isFullScreen ? css.hostFullscreen : css.hostFloating}
       className={`${!isFullScreen ? "luxora-chat-floating" : ""} ${className || ""}`}
     >

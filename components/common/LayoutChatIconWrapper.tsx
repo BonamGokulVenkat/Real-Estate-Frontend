@@ -16,10 +16,23 @@ export default function LayoutChatIconWrapper() {
   return (
     <>
       {isOpen && (
-        <PropertyChatWidget
-          isFullScreen={false}
-          onClose={() => setIsOpen(false)}
-        />
+        <>
+          {/* Backdrop overlay so clicking remaining screen closes chatbot */}
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9990,
+              background: "transparent",
+            }}
+            onClick={() => setIsOpen(false)}
+            aria-hidden="true"
+          />
+          <PropertyChatWidget
+            isFullScreen={false}
+            onClose={() => setIsOpen(false)}
+          />
+        </>
       )}
       <FloatingChatButton
         isOpen={isOpen}
