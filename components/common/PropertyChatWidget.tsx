@@ -829,7 +829,8 @@ function ParticleLayer() {
 
 function PropertyCard({ p, index }: { p: PropertyMeta; index: number }) {
   const score = Math.round((p.score || 0) * 100);
-  const thumb = p.media?.[0]?.url;
+  const rawThumb = p.media?.[0]?.url;
+  const thumb = typeof rawThumb === "string" && rawThumb.trim().length > 0 ? rawThumb.trim() : undefined;
   const cardDelay = index * 0.15;
 
   return (
