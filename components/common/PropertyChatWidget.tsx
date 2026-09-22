@@ -732,9 +732,9 @@ const css: Record<string, React.CSSProperties> = {
     height: "22px",
   },
   sendBtn: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "9px",
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
     background: "linear-gradient(135deg, #D97706, #B45309)",
     border: "none",
     cursor: "pointer",
@@ -743,7 +743,7 @@ const css: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     flexShrink: 0,
     color: "#fff",
-    fontSize: "13px",
+    fontSize: "14px",
     transition: "opacity 0.15s, transform 0.1s",
     boxShadow: "0 2px 12px rgba(217,119,6,0.4)",
   },
@@ -1564,6 +1564,7 @@ export default function PropertyChatWidget({
               placeholder="Describe your ideal property…"
               disabled={isStreaming}
               autoComplete="off"
+              enterKeyHint="send"
               rows={1}
             />
             <button

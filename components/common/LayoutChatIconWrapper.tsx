@@ -34,10 +34,12 @@ export default function LayoutChatIconWrapper() {
           />
         </>
       )}
-      <FloatingChatButton
-        isOpen={isOpen}
-        onClick={() => setIsOpen((prev) => !prev)}
-      />
+      {!isOpen && (
+        <FloatingChatButton
+          isOpen={false}
+          onClick={() => setIsOpen(true)}
+        />
+      )}
     </>
   );
 }
