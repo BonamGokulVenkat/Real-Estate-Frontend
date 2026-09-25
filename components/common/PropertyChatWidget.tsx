@@ -35,6 +35,7 @@ export interface Message {
   content: string;
   properties?: PropertyMeta[];
   streaming?: boolean;
+  suggestions?: string[];
 }
 
 export interface PropertyChatWidgetProps {
@@ -776,6 +777,29 @@ const css: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     transition: "all 0.15s",
     fontWeight: 500,
+  },
+  contextualSuggestions: {
+    display: "flex",
+    gap: "6px",
+    flexWrap: "wrap" as const,
+    marginTop: "2px",
+    maxWidth: "88%",
+  },
+  contextChip: {
+    fontSize: "11px",
+    padding: "5px 11px",
+    borderRadius: "999px",
+    border: "0.5px solid rgba(217,119,6,0.35)",
+    background: "rgba(217,119,6,0.08)",
+    color: "#fbbf24",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    whiteSpace: "nowrap" as const,
+    transition: "all 0.15s ease",
+    fontWeight: 500,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
   },
 
   // ── Input ─────────────────────────────────────────────────────────────────
@@ -1643,9 +1667,13 @@ function MarkdownText({ text, streaming }: { text: string; streaming?: boolean }
 function BubbleAI({
   msg,
   onBookVisit,
+  onSendMessage,
+  isStreaming,
 }: {
   msg: Message;
   onBookVisit: (p: PropertyMeta) => void;
+  onSendMessage: (text: string) => void;
+  isStreaming: boolean;
 }) {
   return (
     <div style={css.msgRowAi}>
@@ -1671,6 +1699,31 @@ function BubbleAI({
       <div style={css.bubbleAi}>
         <MarkdownText text={msg.content} streaming={msg.streaming} />
       </div>
+      {(msg.suggestions?.length ?? 0) > 0 && !msg.streaming && (
+        <div style={css.contextualSuggestions} aria-label="Suggested follow-up questions">
+          {msg.suggestions!.map((s) => (
+            <button
+              key={s}
+              type="button"
+              style={{
+                ...css.contextChip,
+                opacity: isStreaming ? 0.5 : 1,
+                cursor: isStreaming ? "not-allowed" : "pointer",
+              }}
+              onClick={() => {
+                if (!isStreaming) {
+                  onSendMessage(s);
+                }
+              }}
+              disabled={isStreaming}
+              title={`Ask: "${s}"`}
+            >
+              <span style={{ fontSize: "10px", opacity: 0.7 }}>✦</span>
+              <span>{s}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1860,7 +1913,7 @@ export default function PropertyChatWidget({
       setMessages((prev) => [
         ...prev,
         { id: userId, role: "user", content: query },
-        { id: aiId, role: "assistant", content: "", properties: [], streaming: true },
+        { id: aiId, role: "assistant", content: "", properties: [], streaming: true, suggestions: [] },
       ]);
 
       const controller = new AbortController();
@@ -1950,11 +2003,37 @@ export default function PropertyChatWidget({
               return;
             }
 
-            if (data.type === "done") {
-              receivedDone = true;
+            if (data.type === "suggestions") {
+              const suggestions = Array.isArray(data.suggestions)
+                ? data.suggestions.filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
+                : [];
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === aiId ? { ...m, streaming: false } : m
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        suggestions,
+                      }
+                    : m
+                )
+              );
+              return;
+            }
+
+            if (data.type === "done") {
+              receivedDone = true;
+              const suggestions = Array.isArray(data.suggestions)
+                ? data.suggestions.filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
+                : undefined;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === aiId
+                    ? {
+                        ...m,
+                        streaming: false,
+                        ...(suggestions ? { suggestions } : {}),
+                      }
+                    : m
                 )
               );
               return;
@@ -2177,6 +2256,8 @@ export default function PropertyChatWidget({
                 key={msg.id}
                 msg={msg}
                 onBookVisit={(p) => setBookingProperty(p)}
+                onSendMessage={(text) => sendMessage(text)}
+                isStreaming={isStreaming}
               />
             )
           )}
