@@ -1949,6 +1949,7 @@ export default function PropertyChatWidget({
         });
 
         if (!res.ok) {
+          if (res.status === 429) throw new Error('Too many requests. Please try again shortly.');
           let errorMsg = `Server returned HTTP ${res.status}`;
           try {
             const errData = await res.json();
