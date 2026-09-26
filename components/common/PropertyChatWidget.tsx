@@ -11,6 +11,7 @@ import { favouriteService, FavoriteItem } from "@/services/favouriteService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
+import { ChatStreamLifecycle } from "@/lib/chatStreamLifecycle";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -37,6 +38,9 @@ export interface Message {
   properties?: PropertyMeta[];
   streaming?: boolean;
   suggestions?: string[];
+  outcome?: "complete" | "partial" | "failed" | "cancelled";
+  issue?: string;
+  retryText?: string;
 }
 
 export interface PropertyChatWidgetProps {
@@ -1678,9 +1682,16 @@ function BubbleAI({
 }) {
   return (
     <div style={css.msgRowAi}>
+      {msg.outcome && msg.outcome !== "complete" && (
+        <div role="status" style={{ color: T.amber, marginBottom: 8 }}>
+          {msg.outcome === "partial" ? "Partial response" : msg.outcome === "cancelled" ? "Response cancelled" : "Response failed"}
+          {msg.issue ? ` — ${msg.issue}` : ""}
+          {msg.retryText && <button type="button" onClick={() => onSendMessage(msg.retryText!)} disabled={isStreaming} style={{ marginLeft: 8 }}>Retry</button>}
+        </div>
+      )}
       {(msg.properties?.length ?? 0) > 0 && (
         <>
-          <div style={css.featuredLabel}>✦ Featured Matches</div>
+          <div style={css.featuredLabel}>✦ {msg.outcome === "complete" ? "Featured Matches" : "Property results"}</div>
           <div style={css.propRow}>
             {msg.properties!.map((p, i) => (
               <PropertyCard
@@ -1817,6 +1828,7 @@ export default function PropertyChatWidget({
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1874,6 +1886,8 @@ export default function PropertyChatWidget({
   }, [isFullScreen, onClose]);
 
   const handleNewChat = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setMessages([
       {
         id: "welcome",
@@ -1886,9 +1900,9 @@ export default function PropertyChatWidget({
     setInput("");
     setShowSuggestions(true);
     setSessionId(null);
+    setIsStreaming(false);
     setIsThinking(false);
     setHeaderStatus("Ready");
-    abortRef.current?.abort();
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -1919,6 +1933,9 @@ export default function PropertyChatWidget({
 
       const controller = new AbortController();
       abortRef.current = controller;
+      let timedOut = false;
+      const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 100000);
+      const lifecycle = new ChatStreamLifecycle(controller.signal);
 
       try {
         setHeaderStatus("Generating embedding…");
@@ -1965,10 +1982,10 @@ export default function PropertyChatWidget({
         const decoder = new TextDecoder();
 
         let buffer = "";
-        let receivedDone = false;
         let receivedAnything = false;
 
         const processEvent = (event: string) => {
+          if (abortRef.current !== controller || controller.signal.aborted || lifecycle.done || lifecycle.error) return;
           const dataLines = event
             .split(/\r?\n/)
             .filter((line) => line.startsWith("data:"))
@@ -1978,10 +1995,7 @@ export default function PropertyChatWidget({
 
           const rawData = dataLines.join("\n");
 
-          if (!rawData || rawData === "[DONE]") {
-            receivedDone = true;
-            return;
-          }
+          if (!rawData || rawData === "[DONE]") return;
 
           try {
             const data = JSON.parse(rawData);
@@ -2023,7 +2037,7 @@ export default function PropertyChatWidget({
             }
 
             if (data.type === "done") {
-              receivedDone = true;
+              lifecycle.accept("done");
               const suggestions = Array.isArray(data.suggestions)
                 ? data.suggestions.filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
                 : undefined;
@@ -2033,6 +2047,7 @@ export default function PropertyChatWidget({
                     ? {
                         ...m,
                         streaming: false,
+                        outcome: "complete",
                         ...(suggestions ? { suggestions } : {}),
                       }
                     : m
@@ -2043,21 +2058,10 @@ export default function PropertyChatWidget({
 
             if (data.type === "error") {
               setIsThinking(false);
-              const errMsg =
+              lifecycle.accept("error",
                 typeof data.message === "string"
                   ? data.message
-                  : "An error occurred while generating recommendations.";
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === aiId
-                    ? {
-                        ...m,
-                        content: m.content ? `${m.content}\n\n${errMsg}` : errMsg,
-                        streaming: false,
-                      }
-                    : m
-                )
-              );
+                  : undefined);
               return;
             }
 
@@ -2091,6 +2095,7 @@ export default function PropertyChatWidget({
 
         while (true) {
           const { done, value } = await reader.read();
+          if (abortRef.current !== controller || controller.signal.aborted) throw new DOMException("Request cancelled", "AbortError");
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -2099,6 +2104,10 @@ export default function PropertyChatWidget({
 
           for (const event of events) {
             processEvent(event);
+          }
+          if (lifecycle.error || lifecycle.done) {
+            await reader.cancel();
+            break;
           }
         }
 
@@ -2110,41 +2119,35 @@ export default function PropertyChatWidget({
           processEvent(buffer);
         }
 
-        if (!receivedAnything) {
-          throw new Error("Server returned an empty streaming response");
-        }
-
-        if (!receivedDone) {
-          console.warn("Stream ended without a done event");
-        }
+        lifecycle.assertComplete(receivedAnything);
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          const errorMessage =
-            err.message && typeof err.message === "string" && !err.message.includes("fetch")
-              ? err.message
-              : "Sorry, something went wrong. Please try again.";
-
+        if (abortRef.current === controller) {
+          const errorMessage = timedOut ? "The request timed out. Please retry." : err?.name === "AbortError" ? "Request cancelled." :
+            err?.message && typeof err.message === "string" && !err.message.includes("fetch") ? err.message : "Sorry, something went wrong. Please try again.";
           setMessages((prev) =>
             prev.map((m) =>
               m.id === aiId
                 ? {
                     ...m,
-                    content: m.content || errorMessage,
                     streaming: false,
+                    outcome: err?.name === "AbortError" && !timedOut ? "cancelled" : m.content || m.properties?.length ? "partial" : "failed",
+                    issue: errorMessage,
+                    retryText: query,
                   }
                 : m
             )
           );
-          console.error("Chat error:", err);
         }
       } finally {
-        setIsStreaming(false);
-        setIsThinking(false);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === aiId ? { ...m, streaming: false } : m))
-        );
-        setHeaderStatus("Ready");
-        inputRef.current?.focus();
+        window.clearTimeout(timeout);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+          setIsStreaming(false);
+          setIsThinking(false);
+          setMessages((prev) => prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m));
+          setHeaderStatus("Ready");
+          inputRef.current?.focus();
+        }
       }
     },
     [input, isStreaming, sessionId]
@@ -2218,7 +2221,7 @@ export default function PropertyChatWidget({
             {onClose && (
               <button
                 style={css.iconBtn}
-                onClick={onClose}
+                onClick={() => { abortRef.current?.abort(); onClose(); }}
                 title="Close chat"
                 aria-label="Close chat"
               >
@@ -2316,9 +2319,9 @@ export default function PropertyChatWidget({
                     ? "0 2px 14px rgba(217,119,6,0.5)"
                     : "none",
               }}
-              onClick={() => sendMessage()}
-              disabled={!input.trim() || isStreaming}
-              aria-label="Send message"
+              onClick={() => isStreaming ? abortRef.current?.abort() : sendMessage()}
+              disabled={!input.trim() && !isStreaming}
+              aria-label={isStreaming ? "Cancel response" : "Send message"}
             >
               {isStreaming ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="#fff" aria-hidden>
