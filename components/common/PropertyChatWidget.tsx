@@ -10,6 +10,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { favouriteService, FavoriteItem } from "@/services/favouriteService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -1924,7 +1925,8 @@ export default function PropertyChatWidget({
 
         const res = await fetch(`${API_URL}/rag/recommend`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(Cookies.get("access_token") ? { Authorization: `Bearer ${Cookies.get("access_token")}` } : {}) },
+          credentials: "include",
           body: JSON.stringify({ message: query, sessionId }),
           signal: controller.signal,
         });
