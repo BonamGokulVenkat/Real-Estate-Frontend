@@ -1,5 +1,6 @@
 // services/propertyService.ts
 import { apiClient } from '../lib/apiClient';
+import { PropertyPricing } from '../lib/propertyPricing';
 
 export type PropertyType = 'house' | 'apartment' | 'villa' | 'land' | 'commercial' | 'townhouse' | 'mansion' | 'penthouse';
 export type PropertyStatus = 'pending' | 'available' | 'sold' | 'rejected' | 'edit_pending' | 'delete_pending';
@@ -11,7 +12,7 @@ export interface PropertyMedia {
   media_type: string;
 }
 
-export interface Property {
+export interface Property extends PropertyPricing {
   property_id: string;
   builder?: {
     user_id: string;
@@ -43,14 +44,14 @@ export interface Property {
   media?: PropertyMedia[];
 }
 
-export interface CreatePropertyPayload {
+export interface CreatePropertyPayload extends PropertyPricing {
   title: string;
   description: string;
   property_type: PropertyType;
   bedrooms: number;
   bathrooms: number;
   size_sqft?: number;
-  price: string;
+  price?: string;
   location: {
     address: string;
     city: string;

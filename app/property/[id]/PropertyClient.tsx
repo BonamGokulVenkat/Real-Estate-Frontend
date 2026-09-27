@@ -40,6 +40,7 @@ import { favouriteService, FavoriteItem } from "@/services/favouriteService";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 
 export default function PropertyClient({
   id,
@@ -51,7 +52,7 @@ export default function PropertyClient({
   const router = useRouter();
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
-  const { formatPrice } = useCurrency();
+  const { currency, rates } = useCurrency();
 
   const { data: property, isLoading, error } = useQuery<Property>({
     queryKey: ["property", id],
@@ -367,7 +368,7 @@ export default function PropertyClient({
                   <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/30 mb-2">Acquisition Price</p>
                   <div className="flex items-baseline gap-2">
                     <span className="text-5xl font-serif font-bold text-amber-500 tracking-tight">
-                      {formatPrice(property.price)}
+                      {formatPropertyPrice(property, currency, rates)}
                     </span>
                   </div>
                 </div>

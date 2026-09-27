@@ -21,6 +21,7 @@ import {
   Star,
 } from "lucide-react";
 import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
@@ -61,7 +62,7 @@ interface Builder {
 export default function AgencyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { formatPrice } = useCurrency();
+  const { currency, rates, formatPrice } = useCurrency();
 
   const [builder, setBuilder] = useState<Builder | null>(null);
   const [loading, setLoading] = useState(true);
@@ -329,7 +330,7 @@ export default function AgencyDetailPage() {
                           {property.status}
                         </div>
                         <div className="absolute bottom-4 right-4 bg-[#0A192F]/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-amber-400 font-bold text-sm border border-white/5">
-                          {formatPrice(property.price)}
+                          {formatPropertyPrice(property, currency, rates)}
                         </div>
                       </div>
 

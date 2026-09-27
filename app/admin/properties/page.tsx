@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,7 +56,6 @@ export default function ManageProperties() {
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
-  const { formatPrice } = useCurrency();
 
   const { data: properties = [], isLoading: isLoadingActive } = useQuery({
     queryKey: ["admin-properties"],
@@ -299,7 +298,7 @@ export default function ManageProperties() {
 
                         <td className="px-8 py-5">
                           <div className="text-base font-serif font-bold text-white">
-                            {formatPrice(p.price)}
+                            {formatPropertyPrice(p)}
                           </div>
 
                           <div className="text-[10px] font-bold uppercase tracking-widest mt-0.5 text-white/40">
@@ -411,7 +410,7 @@ export default function ManageProperties() {
 
                         <td className="px-8 py-6">
                           <p className="text-base font-serif font-bold text-white">
-                            {formatPrice(p.price)}
+                            {formatPropertyPrice(p)}
                           </p>
                         </td>
 
@@ -821,7 +820,7 @@ export default function ManageProperties() {
                       Price
                     </p>
                     <p className="text-3xl font-serif font-bold text-amber-500">
-                      {formatPrice(previewProperty.price)}
+                      {formatPropertyPrice(previewProperty)}
                     </p>
                   </div>
 

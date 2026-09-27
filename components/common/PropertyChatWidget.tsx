@@ -12,6 +12,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
 import { ChatStreamLifecycle } from "@/lib/chatStreamLifecycle";
+import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -1343,6 +1345,7 @@ function PropertyCard({
   const router = useRouter();
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthStore();
+  const { currency, rates } = useCurrency();
 
   const score = Math.round((p.score || 0) * 100);
   const rawThumb = p.media?.[0]?.url;
@@ -1450,7 +1453,7 @@ function PropertyCard({
           📍 {[p.locality, p.city].filter(Boolean).join(", ")}
         </p>
         <div style={css.propDivider} />
-        <p style={css.propPrice}>{formatPrice(p.price)}</p>
+        <p style={css.propPrice}>{formatPropertyPrice(p, currency, rates)}</p>
         <div style={css.propScoreRow}>
           <div style={css.propScoreBarBg}>
             <div

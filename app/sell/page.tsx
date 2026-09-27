@@ -14,8 +14,9 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter } from "next/navigation";
 import TagInput from "@/components/common/ui/TagInputProps";
-import { useCurrency } from "@/hooks/useCurrency";
 import { Controller } from "react-hook-form";
+import { PropertyPricingFields, PricingFieldValues } from "@/components/common/PropertyPricingFields";
+import { structuredPricePayload } from "@/lib/propertyPricing";
 
 interface SellForm {
   title: string;
@@ -49,13 +50,7 @@ export default function Sell() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addressInputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const { formatPrice, currency, setCurrency, rates } = useCurrency();
-
-  const convertToINR = (amount: number): number => {
-    const rate = rates[currency] ?? 1;
-    if (!rate || rate === 0) return amount;
-    return Number((amount / rate).toFixed(2));
-  };
+  const [pricing, setPricing] = useState<PricingFieldValues>({ type: 'FIXED', currency: 'INR', minimum: '', maximum: '', unit: 'amount' });
 
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -101,7 +96,6 @@ export default function Sell() {
   const {
     register,
     handleSubmit,
-    watch,
     reset,
     control,
     setValue,
@@ -214,14 +208,6 @@ export default function Sell() {
 
   if (!isAuthenticated || user?.role !== "builder") return null;
 
-  const currentPrice = watch("price");
-  const numericPrice = Number(currentPrice);
-  const isNumericPrice =
-    currentPrice?.trim() !== "" &&
-    !isNaN(numericPrice) &&
-    isFinite(numericPrice) &&
-    numericPrice > 0;
-
   const normalizeFile = (file: File): File => {
     if (file.name.toLowerCase().endsWith(".jfif")) {
       return new File([file], file.name.replace(/\.jfif$/i, ".jpg"), {
@@ -312,12 +298,6 @@ export default function Sell() {
       setUploadProgress(75);
       toast.loading("Publishing property details...", { id: toastId });
 
-      const priceInSelectedCurrency = Number(data.price);
-      const priceInINR =
-        !isNaN(priceInSelectedCurrency) && isFinite(priceInSelectedCurrency)
-          ? convertToINR(priceInSelectedCurrency)
-          : data.price;
-
       const payload = {
         title: data.title,
         description: data.description || "A luxury estate.",
@@ -326,7 +306,7 @@ export default function Sell() {
         bedrooms: Number(data.bedrooms) || 0,
         bathrooms: Number(data.bathrooms) || 0,
         size_sqft: data.size ? Number(data.size) : undefined,
-        price: String(priceInINR),
+        ...structuredPricePayload(pricing.type as Exclude<PricingFieldValues['type'], 'LEGACY'>, pricing.currency, pricing.minimum, pricing.maximum, pricing.unit),
         location: {
           address: data.address,
           city: data.city,
@@ -473,43 +453,7 @@ export default function Sell() {
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <div className="flex gap-2 items-center">
-                    <label className={labelStyle}>Asking Price</label> <Require />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
-                    <div className="space-y-2 w-18">
-                      <select
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value as any)}
-                        className={`${inputStyle} w-full px-3 appearance-none`}
-                      >
-                        <option value="INR" className="bg-[#0D2137]">₹ INR</option>
-                        <option value="USD" className="bg-[#0D2137]">$ USD</option>
-                        <option value="EUR" className="bg-[#0D2137]">€ EUR</option>
-                        <option value="GBP" className="bg-[#0D2137]">£ GBP</option>
-                        <option value="AED" className="bg-[#0D2137]">AED</option>
-                      </select>
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        {...register("price", { required: "Price is required" })}
-                        type="text"
-                        className={inputStyle}
-                        placeholder="e.g., 120000000 or On Request"
-                      />
-                    </div>
-                  </div>
-                  {errors.price && (
-                    <p className="text-red-400 text-[10px] mt-1">{errors.price.message}</p>
-                  )}
-                  {isNumericPrice && (
-                    <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      ≈ {formatPrice(convertToINR(numericPrice))} · value in INR: ₹
-                      {Math.round(convertToINR(numericPrice)).toLocaleString("en-IN")}
-                    </p>
-                  )}
-                </div>
+                <PropertyPricingFields value={pricing} onChange={setPricing} />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">

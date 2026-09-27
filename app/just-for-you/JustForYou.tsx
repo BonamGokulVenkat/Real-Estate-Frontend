@@ -25,7 +25,7 @@ const types = ["all", "villa", "apartment", "house", "land", "commercial"] as co
 export default function JustForYou() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { formatPrice, currency, getConvertedPrice, rates } = useCurrency();
+  const { formatPrice, currency, getConvertedPrice, getPropertyPriceInINR, rates } = useCurrency();
 
   // ── Guard flag: true while we are the ones updating the URL ──
   const isSelfUpdate = useRef(false);
@@ -114,7 +114,7 @@ export default function JustForYou() {
 
   // ── Fetch filtered properties ─────────────────────────────
   const { data: properties, isLoading, error } = useQuery<Property[]>({
-    queryKey: ["properties", typeFilter, cityFilter, countryFilter, userMaxPriceINR, minBeds, sortBy],
+    queryKey: ["properties", typeFilter, cityFilter, countryFilter, userMaxPriceINR, minBeds, sortBy, rates],
     queryFn: async () => {
       const params: any = {};
       if (typeFilter !== "all") params.property_type = typeFilter;
@@ -130,13 +130,13 @@ export default function JustForYou() {
       console.log("SEARCH PARAMS:", params);
 
       const data = await propertyService.search(params);
-      const getNumericPrice = (price: string) => {
-        const num = Number(price);
-        return isNaN(num) ? Number.MAX_SAFE_INTEGER : num;
+      const getNumericPrice = (property: (typeof data)[number]) => {
+        if (!property.price_currency || !property.price_min) return null;
+        return getPropertyPriceInINR(property.price_min, property.price_currency);
       };
       let sorted = [...data];
-      if (sortBy === "price-asc") sorted.sort((a, b) => getNumericPrice(a.price) - getNumericPrice(b.price));
-      if (sortBy === "price-desc") sorted.sort((a, b) => getNumericPrice(b.price) - getNumericPrice(a.price));
+      if (sortBy === "price-asc") sorted.sort((a, b) => (getNumericPrice(a) ?? Infinity) - (getNumericPrice(b) ?? Infinity));
+      if (sortBy === "price-desc") sorted.sort((a, b) => (getNumericPrice(b) ?? -Infinity) - (getNumericPrice(a) ?? -Infinity));
 
       return sorted;
     },

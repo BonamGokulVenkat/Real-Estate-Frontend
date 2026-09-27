@@ -30,7 +30,8 @@ import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import { useRouter, useParams } from "next/navigation";
 import TagInput from "@/components/common/ui/TagInputProps";
-import { useCurrency } from "@/hooks/useCurrency";
+import { PropertyPricingFields, PricingFieldValues } from "@/components/common/PropertyPricingFields";
+import { structuredPricePayload } from "@/lib/propertyPricing";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
@@ -55,7 +56,7 @@ export default function EditProperty() {
   const propertyId = params.id as string;
 
   const { user, isAuthenticated } = useAuthStore();
-  const { formatPrice, currency, setCurrency } = useCurrency();
+  const [pricing, setPricing] = useState<PricingFieldValues>({ type: 'LEGACY', currency: 'INR', minimum: '', maximum: '', unit: 'amount' });
 
   const [files, setFiles] = useState<File[]>([]);
   const [existingMedia, setExistingMedia] = useState<any[]>([]);
@@ -75,7 +76,6 @@ export default function EditProperty() {
     handleSubmit,
     control,
     reset,
-    watch,
     formState: { errors },
   } = useForm<EditFormData>();
 
@@ -118,6 +118,10 @@ export default function EditProperty() {
       state: property.location?.state || "",
       zipCode: property.location?.zipCode?.toString() || "",
       features: property.features || [],
+    });
+    setPricing({
+      type: property.price_type || 'LEGACY', currency: property.price_currency || 'INR',
+      minimum: property.price_min || property.price, maximum: property.price_max || '', unit: 'amount',
     });
 
     setExistingMedia(property.media || []);
@@ -281,7 +285,7 @@ export default function EditProperty() {
         bedrooms: Number(data.bedrooms),
         bathrooms: Number(data.bathrooms),
         size_sqft: data.size_sqft ? Number(data.size_sqft) : undefined,
-        price: data.price,
+        ...(pricing.type === 'LEGACY' ? { price: pricing.minimum } : structuredPricePayload(pricing.type, pricing.currency, pricing.minimum, pricing.maximum, pricing.unit)),
         location: {
           address: data.address,
           city: data.city,
@@ -338,14 +342,6 @@ export default function EditProperty() {
       </div>
     );
   }
-
-  const currentPrice = watch("price");
-  const numericPrice = Number(currentPrice);
-  const isNumericPrice =
-    currentPrice?.trim() !== "" &&
-    !isNaN(numericPrice) &&
-    isFinite(numericPrice) &&
-    numericPrice > 0;
 
   const sectionHeading =
     "font-serif text-xl font-bold text-white mb-8 flex items-center gap-3 italic";
@@ -483,52 +479,7 @@ export default function EditProperty() {
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className={labelStyle}>Asking Price</label>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
-                    <div className="space-y-2 w-18">
-                      <select
-                        value={currency}
-                        onChange={(e) => setCurrency(e.target.value as any)}
-                        className={`${inputStyle} w-full px-3 appearance-none`}
-                      >
-                        <option value="INR" className="bg-[#0D2137]">
-                          ₹ INR
-                        </option>
-                        <option value="USD" className="bg-[#0D2137]">
-                          $ USD
-                        </option>
-                        <option value="EUR" className="bg-[#0D2137]">
-                          € EUR
-                        </option>
-                        <option value="GBP" className="bg-[#0D2137]">
-                          £ GBP
-                        </option>
-                        <option value="AED" className="bg-[#0D2137]">
-                          AED
-                        </option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1 w-58">
-                      <Input
-                        {...register("price", {
-                          required: "Price is required",
-                        })}
-                        type="text"
-                        className={`${inputStyle} pl-4`}
-                        placeholder="120000000 or Price on Request"
-                      />
-                    </div>
-                  </div>
-
-                  {isNumericPrice && (
-                    <p className="text-amber-500 text-[10px] font-bold uppercase tracking-widest mt-2">
-                      Estimated: {formatPrice(numericPrice)}
-                    </p>
-                  )}
-                </div>
+                <PropertyPricingFields value={pricing} onChange={setPricing} allowLegacy />
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">

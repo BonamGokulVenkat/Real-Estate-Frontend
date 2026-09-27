@@ -36,6 +36,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 import EditProfileModal from "@/components/common/EditProfileModel";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -60,7 +61,7 @@ export default function Profile() {
   const [previewId, setPreviewId] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
-  const { formatPrice, getConvertedPrice } = useCurrency();
+  const { currency, rates, formatPrice, getConvertedPrice } = useCurrency();
 
   const { data: favorites = [], isLoading: loadingFavs } = useQuery({
     queryKey: ["favorites"],
@@ -830,7 +831,7 @@ export default function Profile() {
                       Price
                     </p>
                     <p className="text-3xl font-serif font-bold text-amber-500">
-                      {formatPrice(previewProperty.price)}
+                      {formatPropertyPrice(previewProperty, currency, rates)}
                     </p>
                   </div>
 

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useCurrencyStore, CurrencyCode } from '@/store/useCurrencyStore';
+import { PriceCurrency } from '@/lib/propertyPricing';
 import axios from 'axios';
 
 export const useCurrency = () => {
@@ -31,6 +32,13 @@ export const useCurrency = () => {
     const converted = Number((priceInINR * rate).toFixed(2));
     if (converted > 1e15) return 0;
     return converted;
+  };
+
+  const getPropertyPriceInINR = (amount: string, from: PriceCurrency): number => {
+    const value = Number(amount);
+    const sourceRate = rates[from];
+    if (!Number.isFinite(value) || value <= 0 || !sourceRate) return 0;
+    return value / sourceRate;
   };
 
   const formatPrice = (priceInINR: string | number, options?: { ceil?: boolean }): string => {
@@ -88,5 +96,5 @@ export const useCurrency = () => {
     return `${symbol}${(shouldCeil ? Math.ceil(converted) : Math.round(converted)).toLocaleString()}`;
   };
 
-  return { currency, setCurrency, formatPrice, rates, getConvertedPrice };
+  return { currency, setCurrency, formatPrice, rates, getConvertedPrice, getPropertyPriceInINR };
 };

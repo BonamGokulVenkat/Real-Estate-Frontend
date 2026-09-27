@@ -11,12 +11,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useCurrency } from "@/hooks/useCurrency";
+import { formatPropertyPrice } from "@/lib/propertyPricing";
 
 export default function PropertyCard({ property, index }: { property: Property; index: number }) {
   const { isAuthenticated } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { formatPrice } = useCurrency();
+  const { currency, rates } = useCurrency();
 
   // Fetch favorites (deduped by React Query)
   const { data: favorites } = useQuery({
@@ -114,7 +115,7 @@ export default function PropertyCard({ property, index }: { property: Property; 
 
             <div className="absolute bottom-4 left-5">
                <p className="text-white font-serif text-xl font-bold tracking-tight">
-                {formatPrice(property.price)}
+                {formatPropertyPrice(property, currency, rates)}
               </p>
             </div>
           </div>
