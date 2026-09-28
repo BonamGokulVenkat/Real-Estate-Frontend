@@ -19,3 +19,11 @@ export class ChatStreamLifecycle {
     if (!this.done) throw new Error("The response ended before completion. Please retry.");
   }
 }
+
+export function rateLimitMessage(retryAfter: string | null): string {
+  const seconds = Number(retryAfter);
+  if (!retryAfter || !Number.isSafeInteger(seconds) || seconds < 1) {
+    return 'Too many requests. Please try again shortly.';
+  }
+  return `Too many requests. Try again in ${seconds} second${seconds === 1 ? '' : 's'}.`;
+}

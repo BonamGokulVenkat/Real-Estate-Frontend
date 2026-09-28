@@ -11,7 +11,7 @@ import { favouriteService, FavoriteItem } from "@/services/favouriteService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
-import { ChatStreamLifecycle } from "@/lib/chatStreamLifecycle";
+import { ChatStreamLifecycle, rateLimitMessage } from "@/lib/chatStreamLifecycle";
 import { useCurrency } from "@/hooks/useCurrency";
 import { formatPropertyPrice } from "@/lib/propertyPricing";
 
@@ -1952,7 +1952,7 @@ export default function PropertyChatWidget({
         });
 
         if (!res.ok) {
-          if (res.status === 429) throw new Error('Too many requests. Please try again shortly.');
+          if (res.status === 429) throw new Error(rateLimitMessage(res.headers.get('Retry-After')));
           let errorMsg = `Server returned HTTP ${res.status}`;
           try {
             const errData = await res.json();
