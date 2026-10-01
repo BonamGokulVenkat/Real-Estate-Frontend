@@ -11,7 +11,8 @@ import { favouriteService, FavoriteItem } from "@/services/favouriteService";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Cookies from "js-cookie";
-import { ChatStreamLifecycle, rateLimitMessage } from "@/lib/chatStreamLifecycle";
+import { ChatRequestSlot, ChatStreamLifecycle, rateLimitMessage } from "@/lib/chatStreamLifecycle";
+import { clearChat, interruptChat, loadChat, saveChat } from "@/lib/chatSessionState";
 import { useCurrency } from "@/hooks/useCurrency";
 import { formatPropertyPrice } from "@/lib/propertyPricing";
 
@@ -53,6 +54,13 @@ export interface PropertyChatWidgetProps {
   className?: string;
 }
 
+const WELCOME_MESSAGE: Message = {
+  id: "welcome",
+  role: "assistant",
+  content: "Welcome to Luxora Estates! I'm your personal AI property advisor.\n\nTell me what you're looking for - budget, city, size, lifestyle - and I'll find your perfect match from our verified listings.",
+  properties: [],
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
@@ -60,13 +68,6 @@ const SUGGESTIONS = [
   "Luxury villa with pool",
   "Student rental in Pune",
   "Family home with garden",
-];
-
-const HISTORY = [
-  "2 BHK in Bangalore",
-  "Luxury villas Mumbai",
-  "Student rental Pune",
-  "Family homes Delhi",
 ];
 
 // ─── Keyframe injection ───────────────────────────────────────────────────────
@@ -1755,12 +1756,10 @@ function BubbleUser({ msg }: { msg: Message }) {
 
 function Sidebar({
   onNewChat,
-  activeIdx,
-  setActiveIdx,
+  recent,
 }: {
   onNewChat: () => void;
-  activeIdx: number;
-  setActiveIdx: (i: number) => void;
+  recent: string[];
 }) {
   return (
     <div style={css.sidebar}>
@@ -1780,17 +1779,9 @@ function Sidebar({
         New search
       </button>
 
-      <div style={css.sidebarSection}>Recent</div>
-      {HISTORY.map((h, i) => (
-        <div
-          key={h}
-          style={i === activeIdx ? css.historyItemActive : css.historyItem}
-          onClick={() => setActiveIdx(i)}
-        >
-          {i === activeIdx
-            ? <><span style={css.activeDot} />{h}</>
-            : <>{h}</>}
-        </div>
+      <div style={css.sidebarSection}>Recent in this chat</div>
+      {recent.map((text, index) => (
+        <div key={index} style={css.historyItem} title={text}>{text}</div>
       ))}
 
       <div style={{ flex: 1 }} />
@@ -1810,28 +1801,54 @@ export default function PropertyChatWidget({
   onClose,
   className,
 }: PropertyChatWidgetProps = {}) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content:
-        "Welcome to Luxora Estates! I'm your personal AI property advisor.\n\nTell me what you're looking for — budget, city, size, lifestyle — and I'll find your perfect match from our verified listings.",
-      properties: [],
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [headerStatus, setHeaderStatus] = useState("Ready");
   const [isThinking, setIsThinking] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [activeHistory, setActiveHistory] = useState(0);
+  const owner = useAuthStore((state) => state.user?.user_id || "visitor");
+  const authReady = useAuthStore((state) => state.isHydrated);
+  const [loadedOwner, setLoadedOwner] = useState<string | null>(null);
   const [bookingProperty, setBookingProperty] = useState<PropertyMeta | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const requestSlot = useRef(new ChatRequestSlot());
+  const latestRef = useRef({ messages, sessionId });
+  const updateMessages = useCallback((change: (previous: Message[]) => Message[]) => {
+    const next = change(latestRef.current.messages);
+    latestRef.current = { ...latestRef.current, messages: next };
+    setMessages(next);
+  }, []);
+  useEffect(() => { latestRef.current = { messages, sessionId }; }, [messages, sessionId]);
+  useEffect(() => {
+    if (!authReady) return;
+    const saved = loadChat(sessionStorage, owner);
+    if (saved) {
+      latestRef.current = { messages: saved.messages as Message[], sessionId: saved.sessionId };
+      setMessages(saved.messages as Message[]);
+      setSessionId(saved.sessionId);
+      setShowSuggestions(saved.messages.length <= 1);
+    } else {
+      latestRef.current = { messages: [WELCOME_MESSAGE], sessionId: null };
+      setMessages([WELCOME_MESSAGE]);
+      setSessionId(null);
+      setShowSuggestions(true);
+    }
+    setLoadedOwner(owner);
+  }, [authReady, owner]);
+  useEffect(() => {
+    if (loadedOwner !== owner) return;
+    saveChat(sessionStorage, owner, { messages, sessionId });
+  }, [loadedOwner, owner, messages, sessionId]);
+  useEffect(() => () => {
+    requestSlot.current.reset();
+    if (loadedOwner) saveChat(sessionStorage, loadedOwner, {
+      ...latestRef.current, messages: interruptChat(latestRef.current.messages),
+    });
+  }, [loadedOwner]);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1889,20 +1906,13 @@ export default function PropertyChatWidget({
   }, [isFullScreen, onClose]);
 
   const handleNewChat = () => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content:
-          "Welcome to Luxora Estates! I'm your personal AI property advisor.\n\nTell me what you're looking for — budget, city, size, lifestyle — and I'll find your perfect match from our verified listings.",
-        properties: [],
-      },
-    ]);
+    requestSlot.current.reset();
+    latestRef.current = { messages: [WELCOME_MESSAGE], sessionId: null };
+    setMessages([WELCOME_MESSAGE]);
     setInput("");
     setShowSuggestions(true);
     setSessionId(null);
+    if (loadedOwner) clearChat(sessionStorage, loadedOwner);
     setIsStreaming(false);
     setIsThinking(false);
     setHeaderStatus("Ready");
@@ -1917,7 +1927,7 @@ export default function PropertyChatWidget({
   const sendMessage = useCallback(
     async (text?: string) => {
       const query = text || input.trim();
-      if (!query || isStreaming) return;
+      if (!query || isStreaming || loadedOwner !== owner) return;
 
       setInput("");
       if (inputRef.current) inputRef.current.style.height = "22px";
@@ -1928,14 +1938,13 @@ export default function PropertyChatWidget({
       const userId = `${Date.now()}-u`;
       const aiId   = `${Date.now()}-a`;
 
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         { id: userId, role: "user", content: query },
         { id: aiId, role: "assistant", content: "", properties: [], streaming: true, suggestions: [] },
       ]);
 
-      const controller = new AbortController();
-      abortRef.current = controller;
+      const controller = requestSlot.current.begin();
       let timedOut = false;
       const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 100000);
       const lifecycle = new ChatStreamLifecycle(controller.signal);
@@ -1966,7 +1975,10 @@ export default function PropertyChatWidget({
         }
 
         const newSession = res.headers.get("x-session-id");
-        if (newSession) setSessionId(newSession);
+        if (newSession) {
+          latestRef.current = { ...latestRef.current, sessionId: newSession };
+          setSessionId(newSession);
+        }
 
         setHeaderStatus("Searching vector database…");
 
@@ -1976,10 +1988,7 @@ export default function PropertyChatWidget({
 
         const contentType = res.headers.get("content-type") || "";
         if (!contentType.includes("text/event-stream")) {
-          const raw = await res.text();
-          throw new Error(
-            `Expected SSE response but received ${contentType}: ${raw.slice(0, 500)}`
-          );
+          throw new Error("The server did not start a chat stream. Please retry.");
         }
 
         const reader = res.body.getReader();
@@ -1989,7 +1998,7 @@ export default function PropertyChatWidget({
         let receivedAnything = false;
 
         const processEvent = (event: string) => {
-          if (abortRef.current !== controller || controller.signal.aborted || lifecycle.done || lifecycle.error) return;
+          if (!requestSlot.current.isCurrent(controller) || controller.signal.aborted || lifecycle.done || lifecycle.error) return;
           const dataLines = event
             .split(/\r?\n/)
             .filter((line) => line.startsWith("data:"))
@@ -2008,7 +2017,7 @@ export default function PropertyChatWidget({
             if (data.type === "properties") {
               setHeaderStatus("Generating recommendation…");
               setIsThinking(false);
-              setMessages((prev) =>
+              updateMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
                     ? {
@@ -2027,7 +2036,7 @@ export default function PropertyChatWidget({
               const suggestions = Array.isArray(data.suggestions)
                 ? data.suggestions.filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
                 : [];
-              setMessages((prev) =>
+              updateMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
                     ? {
@@ -2045,7 +2054,7 @@ export default function PropertyChatWidget({
               const suggestions = Array.isArray(data.suggestions)
                 ? data.suggestions.filter((s: unknown): s is string => typeof s === "string" && s.trim().length > 0)
                 : undefined;
-              setMessages((prev) =>
+              updateMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
                     ? {
@@ -2071,7 +2080,7 @@ export default function PropertyChatWidget({
 
             if (typeof data.token === "string") {
               setIsThinking(false);
-              setMessages((prev) =>
+              updateMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
                     ? { ...m, content: m.content + data.token }
@@ -2083,7 +2092,7 @@ export default function PropertyChatWidget({
 
             if (typeof data.content === "string") {
               setIsThinking(false);
-              setMessages((prev) =>
+              updateMessages((prev) =>
                 prev.map((m) =>
                   m.id === aiId
                     ? { ...m, content: m.content + data.content }
@@ -2092,14 +2101,14 @@ export default function PropertyChatWidget({
               );
               return;
             }
-          } catch (error) {
-            console.error("Invalid SSE event:", { rawData, error });
+          } catch {
+            console.error("Invalid chat stream event");
           }
         };
 
         while (true) {
           const { done, value } = await reader.read();
-          if (abortRef.current !== controller || controller.signal.aborted) throw new DOMException("Request cancelled", "AbortError");
+          if (!requestSlot.current.isCurrent(controller) || controller.signal.aborted) throw new DOMException("Request cancelled", "AbortError");
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
@@ -2110,7 +2119,7 @@ export default function PropertyChatWidget({
             processEvent(event);
           }
           if (lifecycle.error || lifecycle.done) {
-            await reader.cancel();
+            try { await reader.cancel(); } catch { /* terminal event already received */ }
             break;
           }
         }
@@ -2125,16 +2134,16 @@ export default function PropertyChatWidget({
 
         lifecycle.assertComplete(receivedAnything);
       } catch (err: any) {
-        if (abortRef.current === controller) {
+        if (requestSlot.current.isCurrent(controller)) {
           const errorMessage = timedOut ? "The request timed out. Please retry." : err?.name === "AbortError" ? "Request cancelled." :
             err?.message && typeof err.message === "string" && !err.message.includes("fetch") ? err.message : "Sorry, something went wrong. Please try again.";
-          setMessages((prev) =>
+          updateMessages((prev) =>
             prev.map((m) =>
               m.id === aiId
                 ? {
                     ...m,
                     streaming: false,
-                    outcome: err?.name === "AbortError" && !timedOut ? "cancelled" : m.content || m.properties?.length ? "partial" : "failed",
+                    outcome: m.content || m.properties?.length ? "partial" : err?.name === "AbortError" && !timedOut ? "cancelled" : "failed",
                     issue: errorMessage,
                     retryText: query,
                   }
@@ -2144,17 +2153,16 @@ export default function PropertyChatWidget({
         }
       } finally {
         window.clearTimeout(timeout);
-        if (abortRef.current === controller) {
-          abortRef.current = null;
+        if (requestSlot.current.finish(controller)) {
           setIsStreaming(false);
           setIsThinking(false);
-          setMessages((prev) => prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m));
+          updateMessages((prev) => prev.map((m) => m.id === aiId ? { ...m, streaming: false } : m));
           setHeaderStatus("Ready");
           inputRef.current?.focus();
         }
       }
     },
-    [input, isStreaming, sessionId]
+    [input, isStreaming, sessionId, loadedOwner, owner, updateMessages]
   );
 
   return (
@@ -2169,8 +2177,7 @@ export default function PropertyChatWidget({
       {isFullScreen && (
         <Sidebar
           onNewChat={handleNewChat}
-          activeIdx={activeHistory}
-          setActiveIdx={setActiveHistory}
+          recent={messages.filter((message) => message.role === "user").slice(-5).reverse().map((message) => message.content)}
         />
       )}
 
@@ -2209,8 +2216,6 @@ export default function PropertyChatWidget({
                 style={css.iconBtn}
                 title="Open in full page"
                 aria-label="Open chat page"
-                target="_blank"
-                rel="noopener noreferrer"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <polyline points="15 3 21 3 21 9" />
@@ -2225,7 +2230,7 @@ export default function PropertyChatWidget({
             {onClose && (
               <button
                 style={css.iconBtn}
-                onClick={() => { abortRef.current?.abort(); onClose(); }}
+                onClick={() => { requestSlot.current.reset(); onClose(); }}
                 title="Close chat"
                 aria-label="Close chat"
               >
@@ -2323,7 +2328,7 @@ export default function PropertyChatWidget({
                     ? "0 2px 14px rgba(217,119,6,0.5)"
                     : "none",
               }}
-              onClick={() => isStreaming ? abortRef.current?.abort() : sendMessage()}
+              onClick={() => isStreaming ? requestSlot.current.cancel() : sendMessage()}
               disabled={!input.trim() && !isStreaming}
               aria-label={isStreaming ? "Cancel response" : "Send message"}
             >
