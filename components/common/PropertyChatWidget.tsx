@@ -64,10 +64,9 @@ const WELCOME_MESSAGE: Message = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const SUGGESTIONS = [
-  "2 BHK under ₹50L in Bangalore",
-  "Luxury villa with pool",
-  "Student rental in Pune",
-  "Family home with garden",
+  "Show me available properties",
+  "Find apartments",
+  "Find villas",
 ];
 
 // ─── Keyframe injection ───────────────────────────────────────────────────────
